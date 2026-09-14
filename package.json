@@ -1,0 +1,37 @@
+{
+  "name": "notion-suite",
+  "version": "1.1.0",
+  "description": "Notion-style databases, views, rollups, charts and slash commands for Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "typecheck": "tsc -noEmit -skipLibCheck",
+    "test": "node tests/run.mjs",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "notion",
+    "database",
+    "kanban",
+    "rollup"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.8.7",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navysum/notion-suite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/navysum/notion-suite/issues"
+  },
+  "homepage": "https://github.com/navysum/notion-suite"
+}
