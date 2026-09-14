@@ -14,6 +14,39 @@ import { autoColor } from "../utils/dom";
 /** Property types whose value is computed on read and never stored in a note. */
 export const DERIVED_TYPES: PropertyType[] = ["formula", "rollup", "created", "updated"];
 
+/**
+ * The frontmatter a newly created row starts with.
+ *
+ * Seeds arrive from a view's filters and from board and calendar "new" buttons,
+ * and those can legitimately name a derived property -- a board grouped by a
+ * rollup, say. Derived values are computed on read, so writing one into the note
+ * would plant a key that looks like data, is stale the moment it lands, and
+ * becomes wrong live data if the property's type ever changes.
+ */
+export function seedFrontmatter(
+	schema: DatabaseSchema,
+	seed: Record<string, unknown>
+): Record<string, unknown> {
+	const frontmatter: Record<string, unknown> = { ...(schema.defaultTemplate ?? {}) };
+	const derived = new Set(
+		schema.properties.filter((p) => DERIVED_TYPES.includes(p.type)).map((p) => p.id)
+	);
+
+	for (const [key, value] of Object.entries(seed)) {
+		if (derived.has(key)) continue;
+		if (value !== undefined && value !== null && value !== "") frontmatter[key] = value;
+	}
+	// Give the editable properties an explicit starting value so the new row
+	// renders with real controls rather than a line of empty cells.
+	for (const prop of schema.properties) {
+		if (DERIVED_TYPES.includes(prop.type)) continue;
+		if (frontmatter[prop.id] !== undefined) continue;
+		if (prop.type === "checkbox") frontmatter[prop.id] = false;
+		else if (prop.type === "multiselect") frontmatter[prop.id] = [];
+	}
+	return frontmatter;
+}
+
 export function slugify(input: string): string {
 	return (
 		input
@@ -275,18 +308,7 @@ export class DatabaseStore extends Events {
 			path = normalizePath(`${schema.folder}/${base} ${counter++}.md`);
 		}
 
-		const frontmatter: Record<string, unknown> = { ...(schema.defaultTemplate ?? {}) };
-		for (const [key, value] of Object.entries(seed)) {
-			if (value !== undefined && value !== null && value !== "") frontmatter[key] = value;
-		}
-		for (const prop of schema.properties) {
-			if (DERIVED_TYPES.includes(prop.type)) continue;
-			if (frontmatter[prop.id] !== undefined) continue;
-			if (prop.type === "checkbox") frontmatter[prop.id] = false;
-			else if (prop.type === "multiselect") frontmatter[prop.id] = [];
-		}
-
-		const body = `---\n${stringifyYaml(frontmatter)}---\n\n`;
+		const body = `---\n${stringifyYaml(seedFrontmatter(schema, seed))}---\n\n`;
 		const file = await this.app.vault.create(path, body);
 		this.invalidate();
 		return file;

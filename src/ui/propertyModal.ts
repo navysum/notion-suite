@@ -13,6 +13,28 @@ import {
 } from "../types";
 import { autoColor } from "../utils/dom";
 
+/**
+ * Point a dropdown at `preferred` if that is a real option, else at the first
+ * one, and report back what was actually selected.
+ *
+ * `setValue` with an unknown value leaves the control showing the first option
+ * without firing a change event, so the draft would keep a dangling id -- a
+ * relation whose target database was deleted, or a rollup naming a property
+ * that no longer exists -- while the UI claimed otherwise.
+ */
+function selectOption(
+	dropdown: { addOption: (v: string, d: string) => void; setValue: (v: string) => void },
+	options: Array<[string, string]>,
+	preferred: string | undefined
+): string {
+	for (const [value, label] of options) dropdown.addOption(value, label);
+	const resolved = options.some(([value]) => value === preferred)
+		? (preferred as string)
+		: (options[0]?.[0] ?? "");
+	dropdown.setValue(resolved);
+	return resolved;
+}
+
 /** Turn a display name into a frontmatter key. */
 export function propertyKey(name: string): string {
 	return (
@@ -36,6 +58,10 @@ export function propertyKey(name: string): string {
 export class PropertyModal extends Modal {
 	private draft: PropertyDef;
 	private readonly isNew: boolean;
+	/** The type this property had when the modal opened. The Type dropdown
+	 *  writes straight into `draft`, so `draft.type` cannot answer "was this a
+	 *  relation?" once the user has touched it. */
+	private readonly originalType: PropertyDef["type"] | null;
 	private optionsText = "";
 
 	constructor(
@@ -47,6 +73,7 @@ export class PropertyModal extends Modal {
 	) {
 		super(app);
 		this.isNew = existing === null;
+		this.originalType = existing ? existing.type : null;
 		this.draft = existing
 			? JSON.parse(JSON.stringify(existing))
 			: { id: "", name: "", type: "text" };
@@ -150,14 +177,16 @@ export class PropertyModal extends Modal {
 				.setName("Related database")
 				.setDesc("Rows are linked by note title.")
 				.addDropdown((dropdown) => {
-					if (others.length === 0) dropdown.addOption("", "No other databases yet");
-					for (const other of others) dropdown.addOption(other.id, other.name);
-					dropdown
-						.setValue(this.draft.relationDatabaseId ?? others[0]?.id ?? "")
-						.onChange((value) => (this.draft.relationDatabaseId = value));
-					if (!this.draft.relationDatabaseId && others[0]) {
-						this.draft.relationDatabaseId = others[0].id;
-					}
+					const options: Array<[string, string]> =
+						others.length === 0
+							? [["", "No other databases yet"]]
+							: others.map((other) => [other.id, other.name] as [string, string]);
+					this.draft.relationDatabaseId = selectOption(
+						dropdown,
+						options,
+						this.draft.relationDatabaseId
+					);
+					dropdown.onChange((value) => (this.draft.relationDatabaseId = value));
 				});
 		}
 
@@ -186,8 +215,12 @@ export class PropertyModal extends Modal {
 			.setName("Relation")
 			.setDesc("Which link to follow.")
 			.addDropdown((dropdown) => {
-				for (const relation of relations) dropdown.addOption(relation.id, relation.name);
-				dropdown.setValue(this.draft.rollupRelation!).onChange((value) => {
+				this.draft.rollupRelation = selectOption(
+					dropdown,
+					relations.map((relation) => [relation.id, relation.name] as [string, string]),
+					this.draft.rollupRelation
+				);
+				dropdown.onChange((value) => {
 					this.draft.rollupRelation = value;
 					this.draft.rollupProperty = undefined;
 					this.renderTypeOptions(parent.parentElement as HTMLElement);
@@ -216,11 +249,12 @@ export class PropertyModal extends Modal {
 			.setName("Property")
 			.setDesc(`Which property of each related ${target.name} row to gather.`)
 			.addDropdown((dropdown) => {
-				dropdown.addOption(ROLLUP_TITLE_KEY, "Name (note title)");
-				for (const prop of candidates) dropdown.addOption(prop.id, prop.name);
-				dropdown
-					.setValue(this.draft.rollupProperty!)
-					.onChange((value) => (this.draft.rollupProperty = value));
+				const options: Array<[string, string]> = [
+					[ROLLUP_TITLE_KEY, "Name (note title)"],
+					...candidates.map((prop) => [prop.id, prop.name] as [string, string]),
+				];
+				this.draft.rollupProperty = selectOption(dropdown, options, this.draft.rollupProperty);
+				dropdown.onChange((value) => (this.draft.rollupProperty = value));
 			});
 
 		new Setting(parent)
@@ -294,7 +328,7 @@ export class PropertyModal extends Modal {
 			schema.properties = schema.properties.filter((p) => p.id !== draft.id);
 			// Drop rollups that followed a relation which no longer exists,
 			// rather than leaving them silently blank forever.
-			if (draft.type === "relation") {
+			if (this.originalType === "relation") {
 				schema.properties = schema.properties.filter(
 					(p) => !(p.type === "rollup" && p.rollupRelation === draft.id)
 				);

@@ -45,6 +45,7 @@ export function relatedRows(
 			: [String(relationValue)];
 
 	const found: DatabaseRow[] = [];
+	const seen = new Set<string>();
 	for (const raw of names) {
 		// Accept `[[Note]]`, `[[Note|alias]]` and a bare title alike.
 		const name = raw
@@ -55,7 +56,12 @@ export function relatedRows(
 			.trim();
 		if (!name) continue;
 		const row = index.get(name.toLowerCase());
-		if (row) found.push(row);
+		// The same note listed twice is one relation, not two, so a sum over it
+		// must not count the target twice.
+		if (row && !seen.has(row.path)) {
+			seen.add(row.path);
+			found.push(row);
+		}
 	}
 	return found;
 }
@@ -73,9 +79,15 @@ export function gatherValues(
 		}
 		const value = row.values[targetProperty];
 		// A multi-select on the far side contributes each of its values, so
-		// "count unique" over related tags counts tags rather than rows.
-		if (Array.isArray(value)) values.push(...value);
-		else values.push(value);
+		// "count unique" over related tags counts tags rather than rows. An
+		// empty list still contributes one empty value: the row is blank, not
+		// absent, and dropping it would inflate every "percent not empty".
+		if (Array.isArray(value)) {
+			if (value.length === 0) values.push(null);
+			else values.push(...value);
+		} else {
+			values.push(value);
+		}
 	}
 	return values;
 }
@@ -97,6 +109,10 @@ function numbers(values: unknown[]): number[] {
 function dates(values: unknown[]): Date[] {
 	const out: Date[] = [];
 	for (const value of values) {
+		// A bare number parses as epoch milliseconds, which would turn a rollup
+		// mistakenly pointed at a number property into a plausible-looking
+		// 1970-01-01. Frontmatter dates are strings or Dates; require that.
+		if (typeof value === "number") continue;
 		const date = parseDate(value);
 		if (date) out.push(date);
 	}
@@ -105,6 +121,25 @@ function dates(values: unknown[]): Date[] {
 
 function round(n: number): number {
 	return Math.round(n * 10000) / 10000;
+}
+
+/**
+ * Fold rather than spread: `Math.min(...list)` pushes every element onto the
+ * argument stack and throws RangeError somewhere north of 100k values, which
+ * would take down the whole view rather than one cell.
+ */
+function extent(list: number[]): { min: number; max: number } {
+	let min = list[0];
+	let max = list[0];
+	for (const n of list) {
+		if (n < min) min = n;
+		if (n > max) max = n;
+	}
+	return { min, max };
+}
+
+function timeExtent(list: Date[]): { min: number; max: number } {
+	return extent(list.map((d) => d.getTime()));
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -159,31 +194,34 @@ export function collapse(
 		}
 		case "min": {
 			const list = numbers(values);
-			return list.length === 0 ? null : round(Math.min(...list));
+			return list.length === 0 ? null : round(extent(list).min);
 		}
 		case "max": {
 			const list = numbers(values);
-			return list.length === 0 ? null : round(Math.max(...list));
+			return list.length === 0 ? null : round(extent(list).max);
 		}
 		case "range": {
 			const list = numbers(values);
-			return list.length === 0 ? null : round(Math.max(...list) - Math.min(...list));
+			if (list.length === 0) return null;
+			const { min, max } = extent(list);
+			return round(max - min);
 		}
 
 		case "earliest": {
 			const list = dates(values);
 			if (list.length === 0) return null;
-			return toISODate(new Date(Math.min(...list.map((d) => d.getTime()))));
+			return toISODate(new Date(timeExtent(list).min));
 		}
 		case "latest": {
 			const list = dates(values);
 			if (list.length === 0) return null;
-			return toISODate(new Date(Math.max(...list.map((d) => d.getTime()))));
+			return toISODate(new Date(timeExtent(list).max));
 		}
 		case "date_range": {
-			const list = dates(values).map((d) => d.getTime());
+			const list = dates(values);
 			if (list.length === 0) return null;
-			return Math.round((Math.max(...list) - Math.min(...list)) / DAY_MS);
+			const { min, max } = timeExtent(list);
+			return Math.round((max - min) / DAY_MS);
 		}
 
 		case "checked":
@@ -202,12 +240,6 @@ export function collapse(
 		default:
 			return null;
 	}
-}
-
-/** Whether a rollup's result should be treated as a number by sorts and charts. */
-export function isNumericRollup(how: RollupFunction | undefined): boolean {
-	if (!how) return false;
-	return !["show_original", "earliest", "latest"].includes(how);
 }
 
 /**
