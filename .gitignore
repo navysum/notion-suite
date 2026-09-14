@@ -1,0 +1,9 @@
+node_modules/
+tests/.build/
+*.js.map
+
+# The compiled plugin is a build artifact. It ships as a GitHub release asset,
+# not in the repository: the community directory verifies that a release was
+# actually built from the committed source, and a stale committed bundle is
+# exactly what that check exists to catch.
+main.js

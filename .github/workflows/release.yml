@@ -1,0 +1,79 @@
+name: Release
+
+# Publishing is driven by the version in manifest.json, not by tags: bump the
+# version, push, and the matching GitHub release is built and published. That
+# is what Obsidian's updater and BRAT actually read. A push that does not
+# change the version is a no-op, so ordinary commits never ship anything.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read the version from manifest.json
+        id: manifest
+        run: echo "version=$(node -p "require('./manifest.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Has this version already been released?
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.manifest.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.manifest.outputs.version }} already exists — nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Never publish a build that does not typecheck, pass its tests and build.
+      - name: Verify
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Check for optional styles
+        if: steps.check.outputs.exists == 'false'
+        id: styles
+        run: |
+          [ -f styles.css ] && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+
+      # `gh release create` also creates the tag, so the tag always matches the
+      # manifest version — which is the rule Obsidian enforces. No `v` prefix.
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.manifest.outputs.version }}"
+          gh release create "$version" \
+            --title="$version" \
+            --notes="Installed automatically by Obsidian. See CHANGELOG.md for what changed in $version." \
+            main.js manifest.json ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
