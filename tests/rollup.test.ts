@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { collapse, computeRollup, gatherValues, indexByName, relatedRows } from "../src/db/rollup";
 import { RowResolver, ResolverSource } from "../src/db/resolve";
+import { seedFrontmatter } from "../src/db/store";
 import { formatValue, compareValues } from "../src/db/value";
 import { DatabaseRow, DatabaseSchema, PropertyDef, ROLLUP_TITLE_KEY } from "../src/types";
 
@@ -305,6 +306,110 @@ test("resolver caches ordinary, acyclic results", () => {
 	resolver.clear();
 	resolver.rows(projects);
 	assert.ok(baseCalls > callsAfterFirst, "clear() should force a recompute");
+});
+
+// --- regressions -----------------------------------------------------------
+
+test("resolution stays linear when a rollup cycle is present", () => {
+	// A chain of databases, each rolling up the next, with a back edge from the
+	// last to the first. A cycle used to disable caching for every database in
+	// the pass, so each rollup re-walked its target and cost grew as 2^depth.
+	const build = (depth: number): DatabaseSchema[] =>
+		Array.from({ length: depth }, (_unused, i) => ({
+			id: `db${i}`,
+			name: `DB${i}`,
+			folder: `f${i}`,
+			createdAt: 0,
+			views: [],
+			properties: [
+				{
+					id: "rel",
+					name: "Rel",
+					type: "relation",
+					relationDatabaseId: i === depth - 1 ? "db0" : `db${i + 1}`,
+				},
+				{ id: "r1", name: "R1", type: "rollup", rollupRelation: "rel", rollupProperty: "n", rollupFunction: "sum" },
+				{ id: "r2", name: "R2", type: "rollup", rollupRelation: "rel", rollupProperty: "n", rollupFunction: "max" },
+				{ id: "n", name: "N", type: "number" },
+			],
+		})) as DatabaseSchema[];
+
+	const measure = (depth: number): number => {
+		const schemas = build(depth);
+		let calls = 0;
+		const resolver = new RowResolver({
+			schema: (id) => schemas.find((s) => s.id === id),
+			baseRows: (s) => {
+				calls++;
+				return [row("Row", { n: 1, rel: ["Row"] })];
+			},
+		});
+		resolver.rows(schemas[0]);
+		return calls;
+	};
+
+	// Linear in depth, with a small constant for the re-entry fallbacks.
+	assert.ok(measure(4) <= 12, `depth 4 took ${measure(4)} base reads`);
+	assert.ok(measure(12) <= 30, `depth 12 took ${measure(12)} base reads`);
+});
+
+test("a new row never has a derived value written into its frontmatter", () => {
+	// A view filtered on a rollup, or a board grouped by one, seeds new rows
+	// from that rule. Persisting it would plant a key that goes stale at once.
+	const written = seedFrontmatter(projects, {
+		total_hours: 8,
+		cost: 800,
+		rate: 100,
+		tasks: ["Design"],
+	});
+	assert.equal(written.total_hours, undefined, "rollup must not be persisted");
+	assert.equal(written.cost, undefined, "formula must not be persisted");
+	assert.equal(written.rate, 100, "a real property is still seeded");
+	assert.deepEqual(written.tasks, ["Design"]);
+});
+
+test("a new row starts editable properties at an explicit empty value", () => {
+	const written = seedFrontmatter(tasks, {});
+	assert.equal(written.done, false);
+	assert.equal(written.hours, undefined);
+});
+
+test("a related row with an empty list counts as empty, not as absent", () => {
+	// Dropping empty lists entirely removed the row from the denominator, so
+	// "percent not empty" read 100% across mostly-blank rows.
+	const rows = [row("A", { tags: ["x"] }), row("B", { tags: [] })];
+	const values = gatherValues(rows, "tags");
+	assert.equal(values.length, 2);
+	assert.equal(collapse(values, 2, "count_empty"), 1);
+	assert.equal(collapse(values, 2, "count_not_empty"), 1);
+	assert.equal(collapse(values, 2, "percent_not_empty"), 50);
+});
+
+test("the same note listed twice in a relation counts once", () => {
+	const index = indexByName([row("Task", { hours: 5 })]);
+	assert.equal(relatedRows(["Task", "[[Task]]"], index).length, 1);
+	assert.equal(computeRollup(rollupDef, ["Task", "Task"], index), 5);
+});
+
+test("date aggregations ignore plain numbers instead of reading them as epochs", () => {
+	// A rollup pointed at a number property used to report a confident 1970.
+	assert.equal(collapse([3, 7], 2, "earliest"), null);
+	assert.equal(collapse([3, 7], 2, "latest"), null);
+	assert.equal(collapse([3, 7], 2, "date_range"), null);
+});
+
+test("min, max and range survive a gather too large to spread as arguments", () => {
+	// Math.min(...list) throws RangeError past roughly 125k arguments.
+	const many = Array.from({ length: 200_000 }, (_unused, i) => i);
+	assert.equal(collapse(many, many.length, "min"), 0);
+	assert.equal(collapse(many, many.length, "max"), 199_999);
+	assert.equal(collapse(many, many.length, "range"), 199_999);
+
+	const dates = Array.from({ length: 200_000 }, (_unused, i) =>
+		new Date(2020, 0, 1 + (i % 365)).toISOString().slice(0, 10)
+	);
+	assert.equal(collapse(dates, dates.length, "earliest"), "2020-01-01");
+	assert.equal(collapse(dates, dates.length, "latest"), "2020-12-30");
 });
 
 // --- presentation ----------------------------------------------------------

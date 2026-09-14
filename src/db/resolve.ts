@@ -24,37 +24,53 @@ export interface ResolverSource {
  * resolution tracks what it is currently working on and, on re-entry, falls
  * back to the unresolved base rows instead of recursing forever.
  *
- * A cycle has no fixed point, so results touching one are computed to a single
- * level and deliberately not cached -- caching a partial answer would let it
- * leak into later, non-cyclic reads.
+ * Two caches, because those two jobs pull in opposite directions:
+ *
+ * - `passMemo` lives for one top-level resolution and holds *everything*. It is
+ *   what stops a diamond or a cycle re-walking the same database once per
+ *   referring rollup, which is exponential in the depth of the graph.
+ * - `cache` persists until `clear()` and holds only results that did not depend
+ *   on a cycle. A cycle has no fixed point, so its results are computed to a
+ *   single level; keeping them would let that partial answer leak into a later,
+ *   unrelated read.
  */
 export class RowResolver {
 	private cache = new Map<string, DatabaseRow[]>();
+	private passMemo = new Map<string, DatabaseRow[]>();
 	private resolving = new Set<string>();
-	private sawCycle = false;
+	/** Databases whose result in this pass depended on a cycle. */
+	private tainted = new Set<string>();
 
 	constructor(private source: ResolverSource) {}
 
 	clear(): void {
 		this.cache.clear();
+		this.passMemo.clear();
 		this.resolving.clear();
-		this.sawCycle = false;
+		this.tainted.clear();
 	}
 
+	/**
+	 * Fully resolved rows for a database.
+	 *
+	 * The returned array may be shared with other callers, so treat it as
+	 * read-only: sorting it in place or writing into `row.values` would corrupt
+	 * every other view reading the same database.
+	 */
 	rows(schema: DatabaseSchema): DatabaseRow[] {
-		const cached = this.cache.get(schema.id);
+		const cached = this.cache.get(schema.id) ?? this.passMemo.get(schema.id);
 		if (cached) return cached;
 
 		// Re-entered while already resolving this database: this is the cycle.
-		// Hand back the unresolved rows so the caller can finish.
+		// Everything currently on the stack is now resting on an unresolved
+		// answer, so none of it may be kept beyond this pass.
 		if (this.resolving.has(schema.id)) {
-			this.sawCycle = true;
+			for (const id of this.resolving) this.tainted.add(id);
+			this.tainted.add(schema.id);
 			return this.source.baseRows(schema);
 		}
 
 		const outermost = this.resolving.size === 0;
-		if (outermost) this.sawCycle = false;
-
 		this.resolving.add(schema.id);
 		try {
 			const rows = this.source.baseRows(schema);
@@ -62,10 +78,17 @@ export class RowResolver {
 			// but a rollup never reads a formula on its own row.
 			this.resolveRollups(schema, rows);
 			resolveFormulas(schema, rows);
-			if (!this.sawCycle) this.cache.set(schema.id, rows);
+
+			this.passMemo.set(schema.id, rows);
+			// Checked after the subtree resolved, since that is when taint appears.
+			if (!this.tainted.has(schema.id)) this.cache.set(schema.id, rows);
 			return rows;
 		} finally {
 			this.resolving.delete(schema.id);
+			if (outermost) {
+				this.passMemo.clear();
+				this.tainted.clear();
+			}
 		}
 	}
 
