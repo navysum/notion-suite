@@ -14,6 +14,7 @@ export interface NotionSettings {
 	slashTrigger: string;
 	defaultDatabaseFolder: string;
 	notionTypography: boolean;
+	sidePeek: boolean;
 	compactRows: boolean;
 	showRowNumbers: boolean;
 	databases: DatabaseSchema[];
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	slashTrigger: "/",
 	defaultDatabaseFolder: "Databases",
 	notionTypography: true,
+	sidePeek: true,
 	compactRows: false,
 	showRowNumbers: false,
 	databases: [],
@@ -111,6 +113,12 @@ export class NotionSettingTab extends PluginSettingTab {
 							placeholder: "Databases",
 							defaultValue: "Databases",
 						},
+					},
+					{
+						name: "Open rows beside the view",
+						desc: "Clicking a row opens its note in a side pane, so you keep the table or board you were working in.",
+						aliases: ["peek", "split", "pane", "preview"],
+						control: { type: "toggle", key: "sidePeek", defaultValue: true },
 					},
 					{
 						name: "Compact rows",

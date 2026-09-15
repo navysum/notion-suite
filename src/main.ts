@@ -103,6 +103,7 @@ export default class NotionForObsidian extends Plugin {
 				store: this.store,
 				schema,
 				sourcePath: ctx.sourcePath,
+				sidePeek: this.settings.sidePeek,
 				refresh: () => child.rerender(),
 				requestEdit: () => {
 					new InsertViewModal(

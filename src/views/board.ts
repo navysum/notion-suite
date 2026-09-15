@@ -5,7 +5,7 @@ import { findProperty, groupRows } from "../db/query";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
 import { asText } from "../utils/text";
-import { createInlineRow } from "./table";
+import { createInlineRow, renderTemplatePicker } from "./table";
 
 /**
  * Kanban board. Cards are dragged between columns; dropping writes the new
@@ -68,6 +68,7 @@ export function renderBoard(
 		const add = column.createDiv({ cls: "nfo-board-add" });
 		setIcon(add.createSpan(), "plus");
 		add.createSpan({ text: "New" });
+		renderTemplatePicker(add, ctx, view);
 		add.addEventListener("click", () => {
 			const seed: Record<string, unknown> = {};
 			if (groupProp && group.key !== "") {
@@ -148,7 +149,7 @@ function renderCard(
 		const value = row.values[prop.id];
 		if (isEmpty(value) && prop.type !== "checkbox") continue;
 
-		if (prop.type === "select") {
+		if (prop.type === "select" || prop.type === "status") {
 			const option = ctx.store.optionFor(prop, String(value));
 			pill(meta, String(value), option?.color ?? autoColor(String(value)));
 		} else if (prop.type === "multiselect") {
@@ -183,7 +184,7 @@ export function coverUrl(ctx: ViewContext, row: DatabaseRow, propertyId: string)
 
 function firstGroupableProperty(ctx: ViewContext, properties: PropertyDef[]): string | null {
 	const candidate = properties.find((p) =>
-		["select", "multiselect", "checkbox"].includes(p.type)
+		["status", "select", "multiselect", "checkbox"].includes(p.type)
 	);
 	return candidate ? candidate.id : null;
 }

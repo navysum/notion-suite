@@ -901,3 +901,58 @@ body.nfo-typography hr {
 
 .nfo-th-add:hover { background: var(--nfo-hover); color: var(--text-normal); opacity: 1; }
 .nfo-th-add svg { width: 14px; height: 14px; }
+
+/* --- Calculate row -------------------------------------------------------- */
+
+.nfo-calc-row .nfo-calc-cell {
+	height: auto;
+	padding: 4px 8px;
+	border-bottom: none;
+	border-top: 1px solid var(--nfo-border-strong);
+	vertical-align: middle;
+}
+
+.nfo-calc-label {
+	font-size: 0.78em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--nfo-muted);
+	opacity: 0.7;
+}
+
+.nfo-calc-pick {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 2px 5px;
+	margin-left: -5px;
+	border-radius: var(--nfo-radius);
+	cursor: pointer;
+	font-size: 0.86em;
+	white-space: nowrap;
+}
+
+.nfo-calc-pick:hover { background: var(--nfo-hover); }
+
+.nfo-calc-name { color: var(--nfo-muted); }
+.nfo-calc-value { font-weight: 600; color: var(--text-normal); }
+
+/* Unset columns stay quiet until the table is hovered. */
+.nfo-calc-empty { color: var(--nfo-muted); opacity: 0; transition: opacity 120ms ease; }
+.nfo-table:hover .nfo-calc-empty { opacity: 0.55; }
+.nfo-calc-empty:hover { opacity: 1; }
+
+/* --- Row templates -------------------------------------------------------- */
+
+.nfo-new-row-templates {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 6px;
+	border-radius: var(--nfo-radius);
+	cursor: pointer;
+	color: var(--nfo-muted);
+	opacity: 0.6;
+}
+
+.nfo-new-row-templates:hover { background: var(--nfo-hover); opacity: 1; }
+.nfo-new-row-templates svg { width: 14px; height: 14px; }

@@ -2,6 +2,7 @@ import { App, Events, TFile, TFolder, normalizePath, stringifyYaml } from "obsid
 import {
 	DatabaseRow,
 	DatabaseSchema,
+	RowTemplate,
 	PropertyDef,
 	PropertyType,
 	SelectOption,
@@ -299,7 +300,8 @@ export class DatabaseStore extends Events {
 	async createRow(
 		schema: DatabaseSchema,
 		name: string,
-		seed: Record<string, unknown> = {}
+		seed: Record<string, unknown> = {},
+		template?: RowTemplate
 	): Promise<TFile | null> {
 		await this.ensureFolder(schema.folder);
 		const base = sanitizeFileName(name || "Untitled");
@@ -309,7 +311,12 @@ export class DatabaseStore extends Events {
 			path = normalizePath(`${schema.folder}/${base} ${counter++}.md`);
 		}
 
-		const body = `---\n${stringifyYaml(seedFrontmatter(schema, seed))}---\n\n`;
+		// A template's values are the starting point; anything the caller seeds
+		// (a board column, a view filter) wins over them, since that is the
+		// context the row is actually being created in.
+		const merged = template ? { ...template.values, ...seed } : seed;
+		const frontmatter = stringifyYaml(seedFrontmatter(schema, merged));
+		const body = `---\n${frontmatter}---\n\n${template?.body ? `${template.body}\n` : ""}`;
 		const file = await this.app.vault.create(path, body);
 		this.invalidate();
 		return file;

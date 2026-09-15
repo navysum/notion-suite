@@ -9,6 +9,8 @@ import {
 	ViewConfig,
 	ViewType,
 	Aggregation,
+	RollupFunction,
+	ROLLUP_FUNCTIONS,
 } from "../types";
 import { asKey, asText } from "../utils/text";
 
@@ -148,7 +150,18 @@ export function filterToText(group: FilterGroup | undefined): string {
 	return group.rules.map(ruleToText).join("\n");
 }
 
-const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar"];
+const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar", "timeline"];
+
+/** Read `calculate: {hours: sum, done: percent_checked}` into a lookup. */
+function parseCalculations(raw: unknown): Record<string, RollupFunction> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+	const out: Record<string, RollupFunction> = {};
+	for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+		const how = asKey(value).replace(/\s+/g, "_");
+		if (ROLLUP_FUNCTIONS.includes(how as RollupFunction)) out[key] = how as RollupFunction;
+	}
+	return Object.keys(out).length > 0 ? out : undefined;
+}
 
 export interface ParsedViewBlock {
 	config: ViewConfig | null;
@@ -190,6 +203,12 @@ export function parseViewBlock(source: string): ParsedViewBlock {
 		visibleProperties: toStringArray(raw.properties ?? raw.props ?? raw.columns),
 		filter: parseFilters(raw.filter ?? raw.filters ?? raw.where),
 		sorts: sorts.length > 0 ? sorts : undefined,
+		calculate: parseCalculations(raw.calculate),
+		timelineStart: asText(raw.start ?? raw.timelineStart) || undefined,
+		timelineEnd: asText(raw.end ?? raw.timelineEnd) || undefined,
+		timelineScale: ["day", "week", "month"].includes(asKey(raw.scale))
+			? (asKey(raw.scale) as "day" | "week" | "month")
+			: undefined,
 		cardSize: ["small", "medium", "large"].includes(String(raw.size))
 			? (String(raw.size) as "small" | "medium" | "large")
 			: undefined,

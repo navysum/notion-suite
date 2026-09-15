@@ -1,6 +1,7 @@
 import { App, Menu } from "obsidian";
 import { DatabaseStore } from "../db/store";
 import { DatabaseSchema } from "../types";
+import { SaveTemplateModal } from "../ui/templateModal";
 
 export interface ViewContext {
 	app: App;
@@ -17,14 +18,40 @@ export interface ViewContext {
 	requestTitleFocus?: (path: string) => void;
 	/** Read and clear that request. Called once per render by the table. */
 	takeTitleFocus?: () => string | null;
+	/** Whether clicking a row opens it beside the view. Defaults to true. */
+	sidePeek?: boolean;
 }
 
-/** Open a row's note, honouring modifier-click for a new pane. */
+/**
+ * Open a row's note.
+ *
+ * By default it opens beside the view rather than over it -- Notion's "side
+ * peek". Losing the board you were working in every time you glance at a row is
+ * the main reason a row-per-file database feels heavier than an inline one.
+ * Modifier-click still forces a new tab, and the behaviour is a setting.
+ */
 export function openRow(ctx: ViewContext, path: string, event?: MouseEvent): void {
 	const file = ctx.store.getFile(path);
 	if (!file) return;
-	const newLeaf = !!event && (event.ctrlKey || event.metaKey || event.button === 1);
-	void ctx.app.workspace.getLeaf(newLeaf).openFile(file);
+
+	if (event && (event.ctrlKey || event.metaKey || event.button === 1)) {
+		void ctx.app.workspace.getLeaf("tab").openFile(file);
+		return;
+	}
+
+	if (ctx.sidePeek === false) {
+		void ctx.app.workspace.getLeaf(false).openFile(file);
+		return;
+	}
+
+	// Reuse the existing side pane when one is already open, so repeated
+	// glances do not stack up panes.
+	const existing = ctx.app.workspace.getLeavesOfType("markdown").find((leaf) => {
+		const root = leaf.getRoot();
+		return root !== ctx.app.workspace.rootSplit;
+	});
+	const leaf = existing ?? ctx.app.workspace.getLeaf("split", "vertical");
+	void leaf.openFile(file);
 }
 
 export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent): void {
@@ -45,6 +72,16 @@ export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent
 			})
 	);
 	menu.addSeparator();
+	menu.addItem((item) =>
+		item
+			.setTitle("Save as template")
+			.setIcon("copy-plus")
+			.onClick(() => {
+				const row = ctx.store.rows(ctx.schema).find((r) => r.path === path);
+				if (!row) return;
+				new SaveTemplateModal(ctx.app, ctx.store, ctx.schema, row, ctx.refresh).open();
+			})
+	);
 	menu.addItem((item) =>
 		item
 			.setTitle("Delete")
