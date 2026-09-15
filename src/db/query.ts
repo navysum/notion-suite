@@ -2,12 +2,14 @@ import {
 	DatabaseRow,
 	DatabaseSchema,
 	FilterGroup,
+	FilterNode,
 	FilterRule,
 	PropertyDef,
+	SelectOption,
 	SortRule,
+	isFilterGroup,
 } from "../types";
 import { compareValues, isEmpty } from "./value";
-import { SelectOption } from "../types";
 import { parseDate } from "../utils/dates";
 import { asKey } from "../utils/text";
 
@@ -112,16 +114,30 @@ function compareDates(actual: unknown, expected: unknown, op: string): boolean {
 	}
 }
 
+/**
+ * Evaluate a filter tree against one row.
+ *
+ * Short-circuits rather than mapping every branch: a filter runs once per row
+ * on every render, and an `or` whose first rule matched has no reason to
+ * evaluate the rest.
+ */
+function matchesNode(schema: DatabaseSchema, row: DatabaseRow, node: FilterNode): boolean {
+	if (!isFilterGroup(node)) return matchesRule(schema, row, node);
+	// An empty group constrains nothing, so it must not exclude every row.
+	if (node.rules.length === 0) return true;
+	if (node.conjunction === "or") {
+		return node.rules.some((child) => matchesNode(schema, row, child));
+	}
+	return node.rules.every((child) => matchesNode(schema, row, child));
+}
+
 export function applyFilter(
 	schema: DatabaseSchema,
 	rows: DatabaseRow[],
 	filter?: FilterGroup
 ): DatabaseRow[] {
 	if (!filter || filter.rules.length === 0) return rows;
-	return rows.filter((row) => {
-		const results = filter.rules.map((rule) => matchesRule(schema, row, rule));
-		return filter.conjunction === "or" ? results.some(Boolean) : results.every(Boolean);
-	});
+	return rows.filter((row) => matchesNode(schema, row, filter));
 }
 
 export function applySorts(

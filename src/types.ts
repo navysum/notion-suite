@@ -22,6 +22,7 @@ export type PropertyType =
 	| "files"
 	| "relation"
 	| "rollup"
+	| "uniqueid"
 	| "formula"
 	| "created"
 	| "updated";
@@ -41,6 +42,7 @@ export const PROPERTY_TYPES: PropertyType[] = [
 	"files",
 	"relation",
 	"rollup",
+	"uniqueid",
 	"formula",
 	"created",
 	"updated",
@@ -61,6 +63,7 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
 	files: "Files & media",
 	relation: "Relation",
 	rollup: "Rollup",
+	uniqueid: "Unique ID",
 	formula: "Formula",
 	created: "Created time",
 	updated: "Last edited time",
@@ -192,6 +195,8 @@ export interface PropertyDef {
 	rollupFunction?: RollupFunction;
 	/** For `status`: which stage each option belongs to. */
 	statusStages?: Record<string, StatusStage>;
+	/** For `uniqueid`: the prefix put in front of the number, e.g. "TASK". */
+	idPrefix?: string;
 	/** For `formula`: an expression evaluated per row. */
 	formula?: string;
 	numberFormat?: "plain" | "percent" | "currency";
@@ -223,10 +228,25 @@ export interface FilterRule {
 	value?: string | number | boolean;
 }
 
+/**
+ * A filter is a tree, not a flat list: Notion allows
+ * `Team is Eng AND (Priority is High OR Priority is Urgent)`.
+ * A group's children are rules or further groups, nested a few levels deep.
+ */
 export interface FilterGroup {
 	conjunction: "and" | "or";
-	rules: FilterRule[];
+	rules: FilterNode[];
 }
+
+export type FilterNode = FilterRule | FilterGroup;
+
+/** Narrow a node without reaching for a cast at every call site. */
+export function isFilterGroup(node: FilterNode): node is FilterGroup {
+	return "conjunction" in node;
+}
+
+/** How deep a filter tree may nest before parsing gives up. */
+export const MAX_FILTER_DEPTH = 3;
 
 export interface SortRule {
 	property: string;
@@ -271,7 +291,26 @@ export interface ViewConfig {
 	timelineEnd?: string;
 	/** Timeline view: how much time one column covers. */
 	timelineScale?: "day" | "week" | "month";
+	/** Properties hidden in this view only, leaving other views untouched. */
+	hiddenProperties?: string[];
+	/** Board: a second grouping, splitting each column. */
+	subGroupBy?: string;
+	/** Board: columns the user has collapsed. */
+	collapsedGroups?: string[];
+	/** Board: per-column card limits. A column over its limit reads as over. */
+	limits?: Record<string, number>;
+	/** Board: bucket a date grouping into overdue/today/this week/later. */
+	dateBuckets?: boolean;
 }
+
+/**
+ * Where a row sits in a manually ordered view.
+ *
+ * Manual order has to live somewhere durable, and the only durable place on a
+ * folder-of-notes model is the note itself, so it is an ordinary number
+ * property the user can see and edit.
+ */
+export const ORDER_STEP = 100;
 
 /**
  * A pre-filled row.
@@ -302,6 +341,12 @@ export interface DatabaseSchema {
 	defaultTemplate?: Record<string, unknown>;
 	/** Named pre-filled rows, offered from the "New" button. */
 	rowTemplates?: RowTemplate[];
+	/** Property holding each row's parent, which turns rows into a tree. */
+	parentProperty?: string;
+	/** Number property holding manual ordering. */
+	orderProperty?: string;
+	/** Next number a `uniqueid` property will hand out. */
+	nextId?: number;
 	createdAt: number;
 }
 
@@ -312,6 +357,10 @@ export interface DatabaseRow {
 	values: Record<string, unknown>;
 	ctime: number;
 	mtime: number;
+	/** How deep this row sits under its parents, when sub-items are in use. */
+	depth?: number;
+	/** Whether any row names this one as its parent. */
+	hasChildren?: boolean;
 }
 
 export type ChartKind = "bar" | "column" | "line" | "area" | "pie" | "donut" | "scatter";

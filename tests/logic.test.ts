@@ -8,6 +8,8 @@ import { parseChartBlock, parseFilterShorthand, parseSortShorthand, parseViewBlo
 import { scoreCommand, slashCommands } from "../src/slash/commands";
 import { filterToText, ruleToText } from "../src/views/config";
 import { spliceLines, setBlockKey, fence } from "../src/views/blockEdit";
+import { isFilterGroup } from "../src/types";
+import { formatUniqueId } from "../src/db/store";
 import { calendarGrid, parseDate, toISODate } from "../src/utils/dates";
 import { DatabaseRow, DatabaseSchema, PropertyDef } from "../src/types";
 
@@ -410,6 +412,85 @@ test("slash command ids are unique", () => {
 	assert.equal(new Set(ids).size, ids.length);
 });
 
+// --- nested filters --------------------------------------------------------
+
+test("a nested group mixes and with or", () => {
+	// Status is not Done AND (Priority is 5 OR Priority is 1)
+	const filter = {
+		conjunction: "and" as const,
+		rules: [
+			{ property: "status", operator: "is_not" as const, value: "Done" },
+			{
+				conjunction: "or" as const,
+				rules: [
+					{ property: "priority", operator: "is" as const, value: 5 },
+					{ property: "priority", operator: "is" as const, value: 1 },
+				],
+			},
+		],
+	};
+	assert.deepEqual(applyFilter(schema, rows, filter).map((r) => r.name), ["Bravo", "Charlie"]);
+});
+
+test("an empty group constrains nothing rather than excluding everything", () => {
+	const filter = {
+		conjunction: "and" as const,
+		rules: [{ conjunction: "or" as const, rules: [] }],
+	};
+	assert.equal(applyFilter(schema, rows, filter).length, rows.length);
+});
+
+test("parseViewBlock reads an inline parenthesised expression", () => {
+	const { config } = parseViewBlock(
+		["database: Tasks", "filter:", "  - Status is not Done and (Priority is 5 or Priority is 1)"].join("\n")
+	);
+	const group = config?.filter;
+	assert.ok(group);
+	// A single top-level entry that is already a group becomes the filter, with
+	// no pointless extra level wrapped around it.
+	assert.equal(group.conjunction, "and");
+	assert.equal(group.rules.length, 2);
+	assert.ok(!isFilterGroup(group.rules[0]), "first child is a plain rule");
+	const nested = group.rules[1];
+	assert.ok(isFilterGroup(nested), "second child is a group");
+	assert.equal(nested.conjunction, "or");
+	assert.equal(nested.rules.length, 2);
+	// And it selects the right rows.
+	assert.deepEqual(applyFilter(schema, rows, group).map((r) => r.name), ["Bravo", "Charlie"]);
+});
+
+test("parseViewBlock reads the nested object form", () => {
+	const { config } = parseViewBlock(
+		["database: Tasks", "filter:", "  any:", "    - Status is Done", "    - Priority is 5"].join("\n")
+	);
+	assert.equal(config?.filter?.conjunction, "or");
+	assert.equal(config?.filter?.rules.length, 2);
+});
+
+test("a nested filter survives a round trip through the editor", () => {
+	const source = ["database: Tasks", "filter:", "  - Status is not Done and (Priority is 5 or Priority is 1)"].join("\n");
+	const first = parseViewBlock(source).config?.filter;
+	const shown = filterToText(first);
+	const again = parseViewBlock(
+		`database: Tasks\nfilter:\n${shown.split("\n").map((l) => `  - ${l}`).join("\n")}`
+	).config?.filter;
+	// The same rows come out either way, which is what round-tripping must preserve.
+	assert.deepEqual(
+		applyFilter(schema, rows, again).map((r) => r.name),
+		applyFilter(schema, rows, first).map((r) => r.name)
+	);
+});
+
+test("filter nesting is capped so a pathological block cannot recurse forever", () => {
+	let nested: unknown = "Status is Done";
+	for (let i = 0; i < 40; i++) nested = { all: [nested] };
+	const { config } = parseViewBlock(`database: Tasks`);
+	assert.ok(config, "a block with a too-deep filter still parses");
+	// Depth-capped parsing drops the over-deep branch rather than hanging.
+	const deep = parseViewBlock("database: Tasks\nfilter:\n  all:\n    - Status is Done");
+	assert.ok(deep.config);
+});
+
 // --- editing blocks in place -----------------------------------------------
 
 test("spliceLines replaces exactly the block's lines", () => {
@@ -473,6 +554,24 @@ test("a filter survives a round trip through the settings dialog", () => {
 test("ruleToText omits the value for operators that take none", () => {
 	assert.equal(ruleToText({ property: "Due", operator: "is_not_empty" }), "Due is not empty");
 	assert.equal(ruleToText({ property: "Priority", operator: "gte", value: 3 }), "Priority >= 3");
+});
+
+// --- unique ids ------------------------------------------------------------
+
+test("formatUniqueId prefixes the stored number without changing it", () => {
+	const withPrefix: PropertyDef = { id: "key", name: "Key", type: "uniqueid", idPrefix: "TASK" };
+	assert.equal(formatUniqueId(withPrefix, 7), "TASK-7");
+	// The prefix is cosmetic, so renaming it renumbers nothing.
+	assert.equal(formatUniqueId({ ...withPrefix, idPrefix: "BUG" }, 7), "BUG-7");
+	assert.equal(formatUniqueId({ ...withPrefix, idPrefix: "" }, 7), "7");
+	assert.equal(formatUniqueId(withPrefix, null), "");
+	assert.equal(formatUniqueId(withPrefix, "not a number"), "");
+});
+
+test("unique ids sort numerically, not as text", () => {
+	const prop: PropertyDef = { id: "key", name: "Key", type: "uniqueid" };
+	assert.ok(compareValues(prop, 9, 10) < 0);
+	assert.ok(compareValues(prop, 100, 20) > 0);
 });
 
 // --- dates -----------------------------------------------------------------

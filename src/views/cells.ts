@@ -6,7 +6,7 @@ import { formatDate, toISODate } from "../utils/dates";
 import { ViewContext, openRow } from "./context";
 import { asText } from "../utils/text";
 
-const READ_ONLY: string[] = ["formula", "rollup", "created", "updated"];
+const READ_ONLY: string[] = ["formula", "rollup", "created", "updated", "uniqueid"];
 
 /**
  * Render one property value as an editable control.

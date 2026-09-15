@@ -16,6 +16,20 @@ import { autoColor } from "../utils/dom";
 export const DERIVED_TYPES: PropertyType[] = ["formula", "rollup", "created", "updated"];
 
 /**
+ * Format a unique ID. The prefix is cosmetic; the number is what is stored,
+ * so renaming the prefix later renumbers nothing.
+ */
+export function formatUniqueId(prop: PropertyDef, value: unknown): string {
+	// Number(null) and Number("") are both 0, which is finite -- an unset id
+	// would render as a real-looking "TASK-0" without this guard.
+	if (value === null || value === undefined || value === "") return "";
+	const n = Number(value);
+	if (!Number.isFinite(n)) return "";
+	const prefix = (prop.idPrefix ?? "").trim();
+	return prefix ? `${prefix}-${n}` : String(n);
+}
+
+/**
  * The frontmatter a newly created row starts with.
  *
  * Seeds arrive from a view's filters and from board and calendar "new" buttons,
@@ -296,6 +310,54 @@ export class DatabaseStore extends Events {
 		this.invalidate();
 	}
 
+	/**
+	 * Claim the next unique id for a database, bumping the stored counter.
+	 *
+	 * The counter is seeded past whatever the rows already use, so a database
+	 * that gained the property after rows existed cannot hand out a duplicate.
+	 */
+	private async nextUniqueId(schema: DatabaseSchema): Promise<number> {
+		const used = this.rows(schema).flatMap((row) =>
+			schema.properties
+				.filter((p) => p.type === "uniqueid")
+				.map((p) => Number(row.values[p.id]))
+				.filter((n) => Number.isFinite(n))
+		);
+		const highest = used.length > 0 ? Math.max(...used) : 0;
+		const next = Math.max(schema.nextId ?? 1, highest + 1);
+		await this.updateDatabase(schema.id, (target) => {
+			target.nextId = next + 1;
+		});
+		return next;
+	}
+
+	/** Give every row that lacks one a unique id, oldest row first. */
+	async backfillUniqueIds(schema: DatabaseSchema): Promise<number> {
+		const idProps = schema.properties.filter((p) => p.type === "uniqueid");
+		if (idProps.length === 0) return 0;
+
+		const missing = this.rows(schema)
+			.filter((row) => idProps.some((p) => !Number.isFinite(Number(row.values[p.id]))))
+			.sort((a, b) => a.ctime - b.ctime);
+
+		for (const row of missing) {
+			const file = this.getFile(row.path);
+			if (!file) continue;
+			for (const prop of idProps) {
+				if (Number.isFinite(Number(row.values[prop.id]))) continue;
+				const id = await this.nextUniqueId(schema);
+				await this.app.fileManager.processFrontMatter(
+					file,
+					(frontmatter: Record<string, unknown>) => {
+						frontmatter[prop.id] = id;
+					}
+				);
+			}
+		}
+		this.invalidate();
+		return missing.length;
+	}
+
 	/** Create a new note in the database folder, seeded with default values. */
 	async createRow(
 		schema: DatabaseSchema,
@@ -314,7 +376,14 @@ export class DatabaseStore extends Events {
 		// A template's values are the starting point; anything the caller seeds
 		// (a board column, a view filter) wins over them, since that is the
 		// context the row is actually being created in.
-		const merged = template ? { ...template.values, ...seed } : seed;
+		const merged = template ? { ...template.values, ...seed } : { ...seed };
+		// Unique ids are assigned here rather than derived on read: the whole
+		// point is that a row keeps the same id for its lifetime.
+		for (const prop of schema.properties) {
+			if (prop.type !== "uniqueid") continue;
+			if (merged[prop.id] !== undefined) continue;
+			merged[prop.id] = await this.nextUniqueId(schema);
+		}
 		const frontmatter = stringifyYaml(seedFrontmatter(schema, merged));
 		const body = `---\n${frontmatter}---\n\n${template?.body ? `${template.body}\n` : ""}`;
 		const file = await this.app.vault.create(path, body);
