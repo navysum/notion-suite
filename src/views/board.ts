@@ -10,6 +10,12 @@ import { DEFAULT_ORDER_PROPERTY, positionFor, seedPositions, sortByOrder } from 
 import { confirm } from "../ui/confirmModal";
 
 /**
+ * Databases whose owner declined to set up manual ordering this session.
+ * Kept in memory rather than saved: a refusal now should not be permanent.
+ */
+const declinedOrdering = new Set<string>();
+
+/**
  * Kanban board. Cards are dragged between columns; dropping writes the new
  * group value straight into the note's frontmatter, so the board and the
  * markdown never disagree.
@@ -83,7 +89,9 @@ export function renderBoard(
 			if (!path || !groupProp) return;
 			const from = evt.dataTransfer?.getData("text/nfo-group") ?? "";
 			// Dropping on the column body, past the cards, means "last".
-			void moveCard(ctx, path, groupProp, from, group.key, group.rows, group.rows.length, view);
+			runMove(
+				moveCard(ctx, path, groupProp, from, group.key, group.rows, group.rows.length, view)
+			);
 		});
 
 		const subKey = view.subGroupBy;
@@ -251,6 +259,20 @@ async function allowedByLimit(
 	});
 }
 
+/**
+ * Run a drop's follow-up work.
+ *
+ * A drop handler cannot await, so the move runs detached -- which means a
+ * failure would otherwise vanish as an unhandled rejection and the card would
+ * simply snap back with no explanation.
+ */
+function runMove(work: Promise<void>): void {
+	work.catch((error: unknown) => {
+		console.error("Notion Suite: moving a card failed", error);
+		new Notice("Could not move that card. See the developer console for details.");
+	});
+}
+
 async function moveCard(
 	ctx: ViewContext,
 	path: string,
@@ -261,9 +283,11 @@ async function moveCard(
 	index = -1,
 	view?: ViewConfig
 ): Promise<void> {
-	// Reordering within one column is a position change, not a group change.
+	// Reordering within one column is a position change, not a group change --
+	// and it is the only case where the user was asking about order, so it is
+	// the only case that may offer to set ordering up.
 	if (sourceKey === targetKey) {
-		if (index >= 0) await reorderWithin(ctx, path, siblings, index);
+		if (index >= 0) await reorderWithin(ctx, path, siblings, index, true);
 		return;
 	}
 
@@ -287,7 +311,9 @@ async function moveCard(
 	}
 
 	await ctx.store.setValue(ctx.schema, path, groupProp.id, value);
-	if (index >= 0) await reorderWithin(ctx, path, siblings, index);
+	// Keep the drop position when the database already records order, but never
+	// interrupt a column change to ask about setting it up.
+	if (index >= 0) await reorderWithin(ctx, path, siblings, index, false);
 	ctx.refresh();
 }
 
@@ -300,8 +326,18 @@ async function moveCard(
  * from then on. The property is hidden, because a position is presentation and
  * nobody wants it occupying a column.
  */
-async function ensureOrderProperty(ctx: ViewContext): Promise<string | null> {
+async function ensureOrderProperty(
+	ctx: ViewContext,
+	mayPrompt: boolean
+): Promise<string | null> {
 	if (ctx.schema.orderProperty) return ctx.schema.orderProperty;
+	// Only offer when the user was actually trying to reorder. Dragging a card
+	// between columns is about its status, and answering a question about
+	// ordering afterwards would be a non sequitur.
+	if (!mayPrompt) return null;
+	// Taking "no" for an answer: asking again on every single drag is worse
+	// than not offering at all.
+	if (declinedOrdering.has(ctx.schema.id)) return null;
 
 	const ok = await confirm(ctx.app, {
 		title: "Remember this order?",
@@ -313,7 +349,10 @@ async function ensureOrderProperty(ctx: ViewContext): Promise<string | null> {
 			"without this plugin. It stays hidden from your views.",
 		confirmText: "Add it and reorder",
 	});
-	if (!ok) return null;
+	if (!ok) {
+		declinedOrdering.add(ctx.schema.id);
+		return null;
+	}
 
 	// Do not collide with a property the user already has.
 	const taken = new Set(ctx.schema.properties.map((p) => p.id));
@@ -338,9 +377,10 @@ async function reorderWithin(
 	ctx: ViewContext,
 	path: string,
 	siblings: DatabaseRow[],
-	index: number
+	index: number,
+	mayPrompt: boolean
 ): Promise<void> {
-	const orderKey = await ensureOrderProperty(ctx);
+	const orderKey = await ensureOrderProperty(ctx, mayPrompt);
 	if (!orderKey) return;
 	const moving = ctx.store.rows(ctx.schema).find((row) => row.path === path);
 	if (!moving) return;
@@ -397,7 +437,9 @@ function renderCard(
 			if (!moved || !groupProp) return;
 			const rect = card.getBoundingClientRect();
 			const below = evt.clientY > rect.top + rect.height / 2;
-			void moveCard(ctx, moved, groupProp, from, groupKey, siblings, position + (below ? 1 : 0), view);
+			runMove(
+				moveCard(ctx, moved, groupProp, from, groupKey, siblings, position + (below ? 1 : 0), view)
+			);
 		});
 	}
 

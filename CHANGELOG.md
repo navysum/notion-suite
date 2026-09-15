@@ -3,6 +3,22 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.6.2
+
+### Fixed
+
+- **Dragging a card between columns no longer asks about ordering.** Moving a
+  card from To do to Doing is about its status; being asked whether you want a
+  position property afterwards was a non sequitur. The offer now appears only
+  when you drag a card *within* a column, which is the only time you were
+  asking about order at all.
+- **Declining that offer is remembered.** It used to ask again on the very next
+  drag, and the one after that. It now takes no for an answer until Obsidian
+  restarts.
+- **A failed card move now says so.** The work after a drop runs detached,
+  because a drop handler cannot wait, so any failure vanished silently and the
+  card just snapped back with no explanation.
+
 ## 1.6.1
 
 Both trade-offs from 1.6.0 turned into choices rather than constraints.
