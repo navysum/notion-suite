@@ -3,6 +3,41 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.6.4
+
+Two silent filter bugs, and a set of checks so that this class of bug cannot
+come back quietly.
+
+### Fixed
+
+- **Opening a view's settings and pressing Save could change which rows it
+  showed, without touching anything.** The filter textarea was read one line at
+  a time by the single-rule parser, but it is filled by the renderer, which
+  writes anything with an `or` in it as one line: `Status is Doing or Priority >
+  4`. That line came back as a single rule about a property called "Status" with
+  the value "Doing or Priority > 4", which matches nothing. Nested filters
+  degraded the same way. Both readers now share one parser.
+- **Two unused imports** that the linter had been warning about.
+
+### Changed
+
+- Per-view state — the search box, collapsed sub-items, ticked rows, the
+  calendar's month, the timeline's window — now lives in one place
+  (`src/views/viewState.ts`) and is passed down as a typed value. Three separate
+  shipped bugs came from state keyed on an element that the next render threw
+  away; there is now no element for a renderer to get wrong.
+
+### Added
+
+- `tests/guards.test.ts`: build-failing checks for the mistakes this codebase
+  has actually made — element-keyed state, dead exports, duplicated aggregation,
+  `eval`.
+- `tests/roundtrip.test.ts`: every filter shape is rendered to text and read back
+  through both readers, and has to still select the same rows.
+- `CONTRIBUTING.md`, documenting each rule alongside the bug that motivated it
+  and the check that enforces it, and `docs/SMOKE.md`, the manual checklist for
+  the paths that only exist while Obsidian is running.
+
 ## 1.6.3
 
 A pass over the whole codebase looking for bugs rather than adding features.

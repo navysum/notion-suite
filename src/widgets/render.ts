@@ -1,5 +1,5 @@
 import { setIcon } from "obsidian";
-import { DatabaseRow, DatabaseSchema, PropertyDef } from "../types";
+import { DatabaseSchema } from "../types";
 import { applyFilter, findProperty, queryRows } from "../db/query";
 import { collapse, gatherValues } from "../db/rollup";
 import { coerce, formatValue, isEmpty } from "../db/value";

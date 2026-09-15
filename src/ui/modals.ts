@@ -9,21 +9,11 @@ import {
 } from "obsidian";
 import { DatabaseStore, slugify } from "../db/store";
 import { DatabaseSchema, ChartKind, Aggregation, ViewType, ChartConfig, ViewConfig } from "../types";
-import { filterToText, parseFilterShorthand } from "../views/config";
+import { filterToText, parseFilterLines } from "../views/config";
 import { buildChartData } from "../charts/aggregate";
 import { renderChart } from "../charts/svg";
 import { fence } from "../views/blockEdit";
-import { FilterGroup, FilterRule } from "../types";
 import { DatabaseTemplate, databaseTemplates } from "./templates";
-
-/** Parse the editor's filter textarea into a filter group. */
-function parseFilterLines(text: string): FilterGroup | undefined {
-	const rules = text
-		.split("\n")
-		.map((line) => parseFilterShorthand(line))
-		.filter((rule): rule is FilterRule => rule !== null);
-	return rules.length > 0 ? { conjunction: "and", rules } : undefined;
-}
 
 /** Pick a database from the ones defined in the vault. */
 export class DatabasePickerModal extends FuzzySuggestModal<DatabaseSchema> {

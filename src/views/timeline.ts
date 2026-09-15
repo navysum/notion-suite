@@ -5,15 +5,7 @@ import { addMonths, formatDate, monthTitle, parseDate, sameDay } from "../utils/
 import { findProperty } from "../db/query";
 import { autoColor } from "../utils/dom";
 import { asText } from "../utils/text";
-
-/**
- * Where each timeline is scrolled to in time.
- *
- * Keyed on the code block's own element (`stateHost`), not on the container we
- * draw into: the container is rebuilt on every refresh, so state stored against
- * it would be discarded the moment the user clicked "next".
- */
-const windowState = new WeakMap<HTMLElement, Date>();
+import { SurfaceState } from "./viewState";
 
 type TimelineScale = "day" | "week" | "month";
 
@@ -33,7 +25,7 @@ export function renderTimeline(
 	view: ViewConfig,
 	rows: DatabaseRow[],
 	properties: PropertyDef[],
-	stateHost: HTMLElement
+	state: SurfaceState
 ): void {
 	// The scale comes from hand-written block config, so an unknown value falls
 	// back to days rather than producing a zero-width chart.
@@ -65,8 +57,10 @@ export function renderTimeline(
 	const endProp = view.timelineEnd ? findProperty(ctx.schema, view.timelineEnd) : undefined;
 
 	const host = container.createDiv({ cls: "nfo-timeline" });
-	const anchor = windowState.get(stateHost) ?? new Date();
-	windowState.set(stateHost, anchor);
+	// See viewState.ts: the anchor rides the surface state, never an element
+	// drawn by this render.
+	const anchor = state.timelineAnchor ?? new Date();
+	state.timelineAnchor = anchor;
 	const first = windowStart(anchor, scale);
 
 	// Bucket boundaries are computed once and reused for every row, rather than
@@ -76,7 +70,7 @@ export function renderTimeline(
 	const lastDay = bucketEndDay(buckets[buckets.length - 1], scale);
 	const canvasWidth = spec.buckets * spec.width;
 
-	renderNav(host, ctx, stateHost, scale, spec.buckets, first, buckets[buckets.length - 1], lastDay);
+	renderNav(host, ctx, state, scale, spec.buckets, first, buckets[buckets.length - 1], lastDay);
 
 	const chart = host.createDiv({ cls: "nfo-timeline-chart" });
 	const labels = chart.createDiv({ cls: "nfo-timeline-labels" });
@@ -180,7 +174,7 @@ export function renderTimeline(
 function renderNav(
 	host: HTMLElement,
 	ctx: ViewContext,
-	stateHost: HTMLElement,
+	state: SurfaceState,
 	scale: TimelineScale,
 	buckets: number,
 	first: Date,
@@ -196,15 +190,15 @@ function renderNav(
 	const todayBtn = nav.createDiv({ cls: "nfo-timeline-today", text: "Today" });
 
 	prev.addEventListener("click", () => {
-		windowState.set(stateHost, shift(first, scale, -buckets));
+		state.timelineAnchor = shift(first, scale, -buckets);
 		ctx.refresh();
 	});
 	next.addEventListener("click", () => {
-		windowState.set(stateHost, shift(first, scale, buckets));
+		state.timelineAnchor = shift(first, scale, buckets);
 		ctx.refresh();
 	});
 	todayBtn.addEventListener("click", () => {
-		windowState.set(stateHost, new Date());
+		state.timelineAnchor = new Date();
 		ctx.refresh();
 	});
 }
