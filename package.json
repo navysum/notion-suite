@@ -1,6 +1,6 @@
 {
   "name": "notion-suite",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Notion-style databases, views, rollups, charts and slash commands for Obsidian.",
   "main": "main.js",
   "scripts": {

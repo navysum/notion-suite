@@ -15,6 +15,8 @@ import { addEditButton } from "./blockEdit";
 interface BlockState {
 	search: string;
 	viewType?: ViewType;
+	/** Row whose title should open for editing on the next render. */
+	focusRow?: string;
 }
 
 const blockState = new WeakMap<HTMLElement, BlockState>();
@@ -30,6 +32,16 @@ export function renderDatabaseView(
 	const state = blockState.get(container) ?? { search: "" };
 	blockState.set(container, state);
 	const activeType = state.viewType ?? view.type;
+
+	// A freshly created row asks to be renamed; the table consumes this once.
+	ctx.requestTitleFocus = (path: string) => {
+		state.focusRow = path;
+	};
+	ctx.takeTitleFocus = () => {
+		const path = state.focusRow ?? null;
+		state.focusRow = undefined;
+		return path;
+	};
 
 	const properties = visibleProperties(ctx, view);
 	let rows = queryRows(ctx.schema, ctx.store.rows(ctx.schema), view.filter, view.sorts, view.pageSize);

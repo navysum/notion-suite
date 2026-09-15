@@ -862,3 +862,42 @@ body.nfo-typography hr {
 /* The dialog holds a lot of controls; keep them scrollable under the preview. */
 .nfo-chart-modal .setting-item { padding-top: 10px; padding-bottom: 10px; }
 .nfo-chart-modal textarea { min-height: 62px; width: 100%; }
+
+/* --- Editing a row's title in the grid ----------------------------------- */
+
+.nfo-row-title {
+	cursor: text;
+	padding: 2px 3px;
+	margin-left: -3px;
+	border-radius: 3px;
+}
+
+.nfo-row-title:hover {
+	background: var(--nfo-hover);
+	border-bottom-color: transparent;
+}
+
+.nfo-title-input { font-weight: 500; }
+
+/* Opening the note is now its own button, so it has to be findable without
+   hovering -- the title no longer does it. */
+.nfo-row-open { opacity: 0.25; }
+.nfo-tr:hover .nfo-row-open { opacity: 0.75; }
+.nfo-row-open:hover { opacity: 1; }
+
+/* --- Adding a property from the header row -------------------------------- */
+
+.nfo-th-add {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: var(--nfo-radius);
+	cursor: pointer;
+	color: var(--nfo-muted);
+	opacity: 0.6;
+}
+
+.nfo-th-add:hover { background: var(--nfo-hover); color: var(--text-normal); opacity: 1; }
+.nfo-th-add svg { width: 14px; height: 14px; }

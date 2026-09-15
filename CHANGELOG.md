@@ -3,6 +3,22 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.4.0
+
+Adding and naming rows no longer takes you out of the view you are working in.
+
+### Changed
+
+- **A row's title is edited in the grid.** Click it and type. Previously the
+  only way to name a row was to open its note and rename the file — which is
+  the main reason databases felt heavier here than in Notion.
+- **"+ New" stays put.** It adds the row and puts the cursor in its title,
+  instead of navigating away from your board or table to the new note. Opening
+  the note is now its own button on the row, always visible rather than
+  appearing on hover.
+- **Add a property from the table header.** A `+` sits at the end of the header
+  row, where your eye already is, instead of only in the Properties menu.
+
 ## 1.3.0
 
 Clears every item in the community directory's review. Needs Obsidian 1.13.0
