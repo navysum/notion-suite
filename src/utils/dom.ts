@@ -32,7 +32,3 @@ export function autoColor(value: string): OptionColor {
 	}
 	return palette[hash % palette.length];
 }
-
-export function clearChildren(node: HTMLElement): void {
-	while (node.firstChild) node.removeChild(node.firstChild);
-}

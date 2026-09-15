@@ -2,6 +2,8 @@ import { App, Menu } from "obsidian";
 import { DatabaseStore } from "../db/store";
 import { DatabaseSchema } from "../types";
 import { SaveTemplateModal } from "../ui/templateModal";
+import { descendantsOf } from "../db/tree";
+import { choose } from "../ui/confirmModal";
 
 export interface ViewContext {
 	app: App;
@@ -48,14 +50,50 @@ export function openRow(ctx: ViewContext, path: string, event?: MouseEvent): voi
 		return;
 	}
 
-	// Reuse the existing side pane when one is already open, so repeated
-	// glances do not stack up panes.
-	const existing = ctx.app.workspace.getLeavesOfType("markdown").find((leaf) => {
-		const root = leaf.getRoot();
-		return root !== ctx.app.workspace.rootSplit;
-	});
+	// Reuse an existing side pane so repeated glances do not stack up panes --
+	// but only one in the right sidebar. "Anywhere outside the main editor"
+	// also matches the left sidebar, so a glance at a row could hijack whatever
+	// the user had pinned over there.
+	const existing = ctx.app.workspace.getLeavesOfType("markdown").find(
+		(leaf) => leaf.getRoot() === ctx.app.workspace.rightSplit
+	);
 	const leaf = existing ?? ctx.app.workspace.getLeaf("split", "vertical");
 	void leaf.openFile(file);
+}
+
+/**
+ * Delete a row, asking first about anything nested under it.
+ *
+ * Sub-items point at their parent by name, so deleting a parent leaves its
+ * children pointing at a note that is gone -- they silently become top-level
+ * rows. Better to say so and offer to take them too.
+ */
+export async function deleteRowAndAsk(ctx: ViewContext, path: string): Promise<void> {
+	const rows = ctx.store.rows(ctx.schema);
+	const children = descendantsOf(ctx.schema, rows, path);
+
+	if (children.length > 0) {
+		const name = rows.find((row) => row.path === path)?.name ?? "this row";
+		const answer = await choose(ctx.app, {
+			title: `Delete “${name}”?`,
+			body: `${children.length} ${children.length === 1 ? "row is" : "rows are"} nested under it.`,
+			detail:
+				"Keeping them leaves them pointing at a note that no longer exists, " +
+				"so they become top-level rows.",
+			choices: [
+				{ id: "one", label: "Delete only this row" },
+				{ id: "all", label: `Delete all ${children.length + 1}`, cta: true, destructive: true },
+			],
+		});
+		// Dismissing cancels the delete outright rather than picking for them.
+		if (answer === null) return;
+		if (answer === "all") {
+			for (const child of children) await ctx.store.deleteRow(child.path);
+		}
+	}
+
+	await ctx.store.deleteRow(path);
+	ctx.refresh();
 }
 
 export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent): void {
@@ -90,10 +128,7 @@ export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent
 		item
 			.setTitle("Delete")
 			.setIcon("trash")
-			.onClick(async () => {
-				await ctx.store.deleteRow(path);
-				ctx.refresh();
-			})
+			.onClick(() => void deleteRowAndAsk(ctx, path))
 	);
 	menu.showAtMouseEvent(event);
 }

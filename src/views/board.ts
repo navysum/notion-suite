@@ -90,7 +90,7 @@ export function renderBoard(
 			const from = evt.dataTransfer?.getData("text/nfo-group") ?? "";
 			// Dropping on the column body, past the cards, means "last".
 			runMove(
-				moveCard(ctx, path, groupProp, from, group.key, group.rows, group.rows.length, view)
+				moveCard(ctx, path, groupProp, from, group.key, group.rows, group.rows.length, view, rows)
 			);
 		});
 
@@ -106,7 +106,7 @@ export function renderBoard(
 				pill(bandHead, sub.label, option?.color ?? autoColor(sub.key));
 				bandHead.createSpan({ cls: "nfo-board-count", text: String(sub.rows.length) });
 				for (const row of sub.rows) {
-					renderCard(band, ctx, row, cardProperties, view, group.key, [], 0, groupProp);
+					renderCard(band, ctx, row, cardProperties, view, group.key, [], 0, groupProp, rows);
 				}
 			}
 		} else {
@@ -114,7 +114,18 @@ export function renderBoard(
 			// to reorder happens.
 			const columnRows = sortByOrder(ctx.schema, group.rows);
 			columnRows.forEach((row, position) => {
-				renderCard(list, ctx, row, cardProperties, view, group.key, columnRows, position, groupProp);
+				renderCard(
+					list,
+					ctx,
+					row,
+					cardProperties,
+					view,
+					group.key,
+					columnRows,
+					position,
+					groupProp,
+					rows
+				);
 			});
 		}
 
@@ -230,7 +241,8 @@ function setLimit(
 async function allowedByLimit(
 	ctx: ViewContext,
 	view: ViewConfig,
-	targetKey: string
+	targetKey: string,
+	visible: DatabaseRow[]
 ): Promise<boolean> {
 	const mode = view.limitMode ?? "soft";
 	if (mode === "soft") return true;
@@ -240,10 +252,13 @@ async function allowedByLimit(
 
 	const groupKey = view.groupBy;
 	if (!groupKey) return true;
+	// Count what the board is showing, not every row in the database: a limit
+	// on a filtered board is about the cards in front of you, and counting
+	// hidden ones would make a column look full while looking empty.
 	const current =
-		groupRows(ctx.schema, ctx.store.rows(ctx.schema), groupKey, {
-			dateBuckets: view.dateBuckets,
-		}).find((group) => group.key === targetKey)?.rows.length ?? 0;
+		groupRows(ctx.schema, visible, groupKey, { dateBuckets: view.dateBuckets }).find(
+			(group) => group.key === targetKey
+		)?.rows.length ?? 0;
 	if (current < limit) return true;
 
 	if (mode === "strict") {
@@ -281,7 +296,8 @@ async function moveCard(
 	targetKey: string,
 	siblings: DatabaseRow[] = [],
 	index = -1,
-	view?: ViewConfig
+	view?: ViewConfig,
+	visible: DatabaseRow[] = []
 ): Promise<void> {
 	// Reordering within one column is a position change, not a group change --
 	// and it is the only case where the user was asking about order, so it is
@@ -291,7 +307,7 @@ async function moveCard(
 		return;
 	}
 
-	if (view && !(await allowedByLimit(ctx, view, targetKey))) return;
+	if (view && !(await allowedByLimit(ctx, view, targetKey, visible))) return;
 
 	let value: unknown;
 	if (groupProp.type === "multiselect") {
@@ -402,7 +418,8 @@ function renderCard(
 	groupKey: string,
 	siblings: DatabaseRow[] = [],
 	position = 0,
-	groupProp?: PropertyDef
+	groupProp?: PropertyDef,
+	visibleRows: DatabaseRow[] = []
 ): void {
 	const card = parent.createDiv({ cls: "nfo-card" });
 	card.setAttribute("draggable", "true");
@@ -438,7 +455,17 @@ function renderCard(
 			const rect = card.getBoundingClientRect();
 			const below = evt.clientY > rect.top + rect.height / 2;
 			runMove(
-				moveCard(ctx, moved, groupProp, from, groupKey, siblings, position + (below ? 1 : 0), view)
+				moveCard(
+					ctx,
+					moved,
+					groupProp,
+					from,
+					groupKey,
+					siblings,
+					position + (below ? 1 : 0),
+					view,
+					visibleRows
+				)
 			);
 		});
 	}

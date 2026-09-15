@@ -24,6 +24,15 @@ export class DatabaseItemView extends ItemView {
 	private databaseId = "";
 	private viewType: ViewType = "table";
 	private detach: (() => void) | null = null;
+	/**
+	 * The element the view draws into, created once and reused.
+	 *
+	 * The renderer keys its per-view state -- the search box, collapsed
+	 * sub-items, ticked rows, the calendar's month -- on the element it is
+	 * handed. Building a fresh one each render would discard all of it, so
+	 * typing in the search box would clear the search box.
+	 */
+	private bodyEl: HTMLElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, private plugin: NotionForObsidian) {
 		super(leaf);
@@ -63,15 +72,17 @@ export class DatabaseItemView extends ItemView {
 	protected async onClose(): Promise<void> {
 		this.detach?.();
 		this.detach = null;
+		this.bodyEl = null;
 	}
 
 	private render(): void {
 		const container = this.contentEl;
-		container.empty();
 		container.addClass("nfo-page");
 
 		const schema = this.plugin.store.get(this.databaseId);
 		if (!schema) {
+			container.empty();
+			this.bodyEl = null;
 			container.createDiv({
 				cls: "nfo-callout-error",
 				text: "This database no longer exists. It may have been removed from settings.",
@@ -79,9 +90,17 @@ export class DatabaseItemView extends ItemView {
 			return;
 		}
 
-		this.renderHeader(container, schema);
+		// Redraw the header, but keep the body element itself so the view state
+		// hanging off it survives.
+		container.querySelector(".nfo-page-header")?.remove();
+		const header = container.createDiv({ cls: "nfo-page-header" });
+		container.insertBefore(header, container.firstChild);
+		this.renderHeader(header, schema);
 
-		const body = container.createDiv({ cls: "nfo-page-body" });
+		if (!this.bodyEl || !this.bodyEl.isConnected) {
+			this.bodyEl = container.createDiv({ cls: "nfo-page-body" });
+		}
+		const body = this.bodyEl;
 		const view: ViewConfig = {
 			id: `page-${schema.id}`,
 			name: "",
@@ -103,9 +122,7 @@ export class DatabaseItemView extends ItemView {
 		renderDatabaseView(body, ctx, view);
 	}
 
-	private renderHeader(container: HTMLElement, schema: DatabaseSchema): void {
-		const header = container.createDiv({ cls: "nfo-page-header" });
-
+	private renderHeader(header: HTMLElement, schema: DatabaseSchema): void {
 		const title = header.createDiv({ cls: "nfo-page-title" });
 		if (schema.icon) title.createSpan({ cls: "nfo-page-icon", text: schema.icon });
 		title.createSpan({ text: schema.name });

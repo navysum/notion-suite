@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { collapse, computeRollup, gatherValues, indexByName, relatedRows } from "../src/db/rollup";
 import { RowResolver, ResolverSource } from "../src/db/resolve";
-import { seedFrontmatter } from "../src/db/store";
+import { seedFrontmatter, highestUsedId } from "../src/db/store";
 import { calculateColumn, calculationsFor, formatCalculation } from "../src/db/calculate";
 import { groupRows } from "../src/db/query";
 import { buildTree, descendantsOf } from "../src/db/tree";
@@ -631,6 +631,44 @@ test("seedPositions spaces an existing column so a first drop has gaps to aim at
 test("the default order property is hidden, since a position is not content", () => {
 	assert.equal(DEFAULT_ORDER_PROPERTY.hidden, true);
 	assert.equal(DEFAULT_ORDER_PROPERTY.type, "number");
+});
+
+test("highestUsedId folds rather than spreading, so a large database cannot overflow", () => {
+	const idSchema: DatabaseSchema = {
+		...tasks,
+		properties: [{ id: "key", name: "Key", type: "uniqueid" }],
+	};
+	// Math.max(...list) throws RangeError past roughly 125k arguments.
+	const many = Array.from({ length: 200_000 }, (_u, i) => row(`R${i}`, { key: i + 1 }));
+	assert.equal(highestUsedId(idSchema, many), 200_000);
+});
+
+test("highestUsedId ignores rows with no id, and databases with no id property", () => {
+	const idSchema: DatabaseSchema = {
+		...tasks,
+		properties: [{ id: "key", name: "Key", type: "uniqueid" }],
+	};
+	assert.equal(highestUsedId(idSchema, [row("A", {}), row("B", { key: 4 })]), 4);
+	assert.equal(highestUsedId(idSchema, []), 0);
+	// No uniqueid property at all: nothing to find.
+	assert.equal(highestUsedId(tasks, [row("A", { key: 9 })]), 0);
+});
+
+test("descendantsOf is what a delete must warn about", () => {
+	const nestedSchema: DatabaseSchema = {
+		...tasks,
+		parentProperty: "parent",
+		properties: [...tasks.properties, { id: "parent", name: "Parent", type: "relation" }],
+	};
+	const list = [
+		row("Epic", {}),
+		row("Story", { parent: ["Epic"] }),
+		row("Task", { parent: ["Story"] }),
+		row("Separate", {}),
+	];
+	// Deleting the epic orphans two rows, not one.
+	assert.equal(descendantsOf(nestedSchema, list, "Epic.md").length, 2);
+	assert.equal(descendantsOf(nestedSchema, list, "Separate.md").length, 0);
 });
 
 // --- presentation ----------------------------------------------------------
