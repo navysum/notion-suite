@@ -956,3 +956,185 @@ body.nfo-typography hr {
 
 .nfo-new-row-templates:hover { background: var(--nfo-hover); opacity: 1; }
 .nfo-new-row-templates svg { width: 14px; height: 14px; }
+
+/* --- Timeline view ------------------------------------------------------- */
+
+.nfo-timeline {
+	--nfo-timeline-label-width: 180px;
+	--nfo-timeline-row-height: 30px;
+	--nfo-timeline-head-height: 38px;
+}
+
+.nfo-timeline-nav {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.nfo-timeline-title { font-weight: 600; margin-right: auto; }
+
+.nfo-timeline-nav-btn,
+.nfo-timeline-today {
+	padding: 3px 8px;
+	border-radius: var(--nfo-radius);
+	cursor: pointer;
+	color: var(--nfo-muted);
+	font-size: 0.9em;
+}
+
+.nfo-timeline-nav-btn:hover, .nfo-timeline-today:hover { background: var(--nfo-hover); }
+.nfo-timeline-nav-btn svg { width: 16px; height: 16px; display: block; }
+
+.nfo-timeline-chart {
+	display: flex;
+	align-items: flex-start;
+	border: 1px solid var(--nfo-border);
+	border-radius: var(--nfo-radius);
+	background: var(--nfo-surface);
+	overflow: hidden;
+}
+
+.nfo-timeline-labels {
+	flex: 0 0 var(--nfo-timeline-label-width);
+	width: var(--nfo-timeline-label-width);
+	border-right: 1px solid var(--nfo-border);
+}
+
+.nfo-timeline-labels-head {
+	height: var(--nfo-timeline-head-height);
+	border-bottom: 1px solid var(--nfo-border);
+	background: var(--nfo-surface-alt);
+}
+
+.nfo-timeline-label {
+	height: var(--nfo-timeline-row-height);
+	line-height: var(--nfo-timeline-row-height);
+	padding: 0 8px;
+	font-size: 0.86em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+	border-bottom: 1px solid var(--nfo-border);
+}
+
+.nfo-timeline-label:hover { background: var(--nfo-hover); }
+
+/* The date axis scrolls on its own, so the row labels stay readable. */
+.nfo-timeline-scroll {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
+.nfo-timeline-canvas { min-width: 100%; }
+
+.nfo-timeline-head {
+	display: flex;
+	height: var(--nfo-timeline-head-height);
+	border-bottom: 1px solid var(--nfo-border);
+	background: var(--nfo-surface-alt);
+}
+
+.nfo-timeline-head-cell {
+	flex: 0 0 auto;
+	box-sizing: border-box;
+	padding: 3px 0;
+	text-align: center;
+	border-right: 1px solid var(--nfo-border);
+	color: var(--nfo-muted);
+	font-size: 0.74em;
+	line-height: 1.25;
+	overflow: hidden;
+}
+
+.nfo-timeline-head-top { font-weight: 600; }
+.nfo-timeline-head-sub { text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; }
+.nfo-timeline-head-cell.nfo-timeline-is-today { color: var(--interactive-accent); }
+
+.nfo-timeline-body { position: relative; }
+
+.nfo-timeline-today-line {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: var(--interactive-accent);
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.nfo-timeline-track {
+	position: relative;
+	height: var(--nfo-timeline-row-height);
+	border-bottom: 1px solid var(--nfo-border);
+	background-image: linear-gradient(to right, var(--nfo-border) 0 1px, transparent 1px);
+	background-repeat: repeat-x;
+}
+
+.nfo-timeline-bar {
+	position: absolute;
+	top: 4px;
+	height: calc(var(--nfo-timeline-row-height) - 9px);
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	padding: 0 6px;
+	border-radius: 4px;
+	background: var(--nfo-color-default-bg);
+	color: var(--nfo-color-fg);
+	font-size: 0.76em;
+	cursor: pointer;
+	overflow: hidden;
+}
+
+.nfo-timeline-bar:hover { filter: brightness(0.95); }
+
+.nfo-timeline-bar-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* A row with no end date is a moment, not a span: draw a dot-sized marker. */
+.nfo-timeline-point { padding: 0; border-radius: 3px; }
+.nfo-timeline-point .nfo-timeline-bar-label { display: none; }
+
+/* Bars running out of the visible window lose the rounding on that edge. */
+.nfo-timeline-clip-start { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.nfo-timeline-clip-end { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+.nfo-timeline-empty {
+	padding: 10px 2px;
+	color: var(--nfo-muted);
+	font-size: 0.88em;
+}
+
+.nfo-timeline-unscheduled { margin-top: 10px; }
+
+.nfo-timeline-unscheduled-title {
+	font-size: 0.8em;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--nfo-muted);
+	margin-bottom: 5px;
+}
+
+.nfo-timeline-unscheduled-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+}
+
+.nfo-timeline-unscheduled-item {
+	padding: 2px 8px;
+	border: 1px solid var(--nfo-border);
+	border-radius: var(--nfo-radius);
+	background: var(--nfo-surface-alt);
+	font-size: 0.82em;
+	cursor: pointer;
+}
+
+.nfo-timeline-unscheduled-item:hover { background: var(--nfo-hover); }
