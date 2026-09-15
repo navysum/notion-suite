@@ -26,20 +26,22 @@ export function renderTable(
 		label.createSpan({ text: prop.name });
 		th.addEventListener("click", (evt) => propertyMenu(evt, ctx, view, prop));
 	}
-	head.createEl("th", { cls: "nfo-th nfo-th-actions" });
+	const addColumn = head.createEl("th", { cls: "nfo-th nfo-th-actions" });
+	const addProp = addColumn.createDiv({ cls: "nfo-th-add" });
+	setIcon(addProp, "plus");
+	addProp.setAttribute("aria-label", "Add a property");
+	addProp.addEventListener("click", () => {
+		new PropertyModal(ctx.app, ctx.store, ctx.schema, null, () => ctx.refresh()).open();
+	});
+
+	const focusPath = ctx.takeTitleFocus ? ctx.takeTitleFocus() : null;
 
 	const body = table.createEl("tbody");
 	for (const row of rows) {
 		const tr = body.createEl("tr", { cls: "nfo-tr" });
 
 		const nameCell = tr.createEl("td", { cls: "nfo-td nfo-td-name" });
-		const link = nameCell.createSpan({ cls: "nfo-row-title", text: row.name });
-		link.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
-
-		const openBtn = nameCell.createSpan({ cls: "nfo-row-open" });
-		setIcon(openBtn, "maximize-2");
-		openBtn.setAttribute("aria-label", "Open note");
-		openBtn.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
+		renderTitleCell(nameCell, ctx, row, focusPath === row.path);
 
 		for (const prop of properties) {
 			const td = tr.createEl("td", { cls: "nfo-td" });
@@ -71,6 +73,65 @@ export function renderTable(
 	count.setText(`${rows.length} ${rows.length === 1 ? "row" : "rows"}`);
 }
 
+/**
+ * The Name cell: the note's title, edited in place.
+ *
+ * A row's title is its filename, so renaming it is a file rename rather than a
+ * frontmatter write -- but from the user's side it should feel like any other
+ * cell. Opening the note moves to its own button, because needing to open a
+ * file just to retitle it is the single biggest piece of friction in a
+ * folder-of-notes database.
+ */
+function renderTitleCell(
+	cell: HTMLElement,
+	ctx: ViewContext,
+	row: DatabaseRow,
+	autoFocus: boolean
+): void {
+	const title = cell.createSpan({ cls: "nfo-row-title", text: row.name });
+
+	const beginEdit = () => {
+		title.hide();
+		const input = cell.createEl("input", { cls: "nfo-cell-input nfo-title-input", type: "text" });
+		input.value = row.name;
+		input.focus();
+		input.select();
+
+		let settled = false;
+		const finish = (save: boolean) => {
+			if (settled) return;
+			settled = true;
+			input.remove();
+			title.show();
+			const next = input.value.trim();
+			if (!save || !next || next === row.name) return;
+			void ctx.store.renameRow(row.path, next).then(() => ctx.refresh());
+		};
+
+		input.addEventListener("blur", () => finish(true));
+		input.addEventListener("keydown", (evt) => {
+			if (evt.key === "Enter") {
+				evt.preventDefault();
+				finish(true);
+			} else if (evt.key === "Escape") {
+				evt.preventDefault();
+				finish(false);
+			}
+		});
+	};
+
+	title.addEventListener("click", beginEdit);
+
+	const openBtn = cell.createSpan({ cls: "nfo-row-open" });
+	setIcon(openBtn, "maximize-2");
+	openBtn.setAttribute("aria-label", "Open note");
+	openBtn.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
+
+	// A row created by "+ New" starts in edit mode, so the next thing you do is
+	// type its name rather than hunt for where it went.
+	if (autoFocus) beginEdit();
+}
+
 /** Seed a new row with whatever the active filter demands, as Notion does. */
 export async function createInlineRow(
 	ctx: ViewContext,
@@ -85,8 +146,11 @@ export async function createInlineRow(
 		seed[prop.id] = prop.type === "multiselect" ? [rule.value] : rule.value;
 	}
 	const file = await ctx.store.createRow(ctx.schema, "Untitled", seed);
+	// Stay put. Notion adds the row in the grid and lets you type its title
+	// there; opening the note would throw the user out of the board or table
+	// they are working in.
+	if (file && ctx.requestTitleFocus) ctx.requestTitleFocus(file.path);
 	ctx.refresh();
-	if (file) await ctx.app.workspace.getLeaf(false).openFile(file);
 }
 
 function propertyMenu(

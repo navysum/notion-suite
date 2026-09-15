@@ -13,6 +13,10 @@ export interface ViewContext {
 	requestEdit?: () => void;
 	/** Persist a single setting back into the block's source. */
 	persistKey?: (key: string, value: string) => void;
+	/** Ask the view to start editing this row's title on the next render. */
+	requestTitleFocus?: (path: string) => void;
+	/** Read and clear that request. Called once per render by the table. */
+	takeTitleFocus?: () => string | null;
 }
 
 /** Open a row's note, honouring modifier-click for a new pane. */

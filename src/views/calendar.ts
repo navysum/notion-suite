@@ -102,8 +102,9 @@ export function renderCalendar(
 				const file = await ctx.store.createRow(ctx.schema, "Untitled", {
 					[dateProp.id]: toISODate(day),
 				});
-				ctx.refresh();
+				// Stay on the calendar, as everywhere else.
 				if (file) await ctx.app.workspace.getLeaf(false).openFile(file);
+				ctx.refresh();
 			})();
 		});
 
