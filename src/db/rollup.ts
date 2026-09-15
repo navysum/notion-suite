@@ -83,8 +83,9 @@ export function gatherValues(
 		// empty list still contributes one empty value: the row is blank, not
 		// absent, and dropping it would inflate every "percent not empty".
 		if (Array.isArray(value)) {
-			if (value.length === 0) values.push(null);
-			else values.push(...value);
+			const items = value as unknown[];
+			if (items.length === 0) values.push(null);
+			else values.push(...items);
 		} else {
 			values.push(value);
 		}

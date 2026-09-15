@@ -8,6 +8,7 @@ import {
 } from "../types";
 import { compareValues, isEmpty } from "./value";
 import { parseDate } from "../utils/dates";
+import { asKey } from "../utils/text";
 
 export function findProperty(schema: DatabaseSchema, key: string): PropertyDef | undefined {
 	const needle = key.trim().toLowerCase();
@@ -33,8 +34,8 @@ function matchesRule(schema: DatabaseSchema, row: DatabaseRow, rule: FilterRule)
 	}
 
 	if (Array.isArray(actual)) {
-		const list = actual.map((v) => String(v).toLowerCase());
-		const needle = String(expected ?? "").toLowerCase();
+		const list = actual.map(asKey);
+		const needle = asKey(expected);
 		switch (rule.operator) {
 			case "contains":
 			case "is":
@@ -53,13 +54,13 @@ function matchesRule(schema: DatabaseSchema, row: DatabaseRow, rule: FilterRule)
 		case "is_not":
 			return !looseEquals(actual, expected);
 		case "contains":
-			return String(actual ?? "").toLowerCase().includes(String(expected ?? "").toLowerCase());
+			return asKey(actual).includes(asKey(expected));
 		case "not_contains":
-			return !String(actual ?? "").toLowerCase().includes(String(expected ?? "").toLowerCase());
+			return !asKey(actual).includes(asKey(expected));
 		case "starts_with":
-			return String(actual ?? "").toLowerCase().startsWith(String(expected ?? "").toLowerCase());
+			return asKey(actual).startsWith(asKey(expected));
 		case "ends_with":
-			return String(actual ?? "").toLowerCase().endsWith(String(expected ?? "").toLowerCase());
+			return asKey(actual).endsWith(asKey(expected));
 		case "gt":
 			return Number(actual) > Number(expected);
 		case "gte":
@@ -82,11 +83,11 @@ function looseEquals(actual: unknown, expected: unknown): boolean {
 	if (typeof actual === "boolean") {
 		const want = typeof expected === "boolean"
 			? expected
-			: ["true", "yes", "checked", "1"].includes(String(expected).toLowerCase());
+			: ["true", "yes", "checked", "1"].includes(asKey(expected));
 		return actual === want;
 	}
 	if (isEmpty(actual) && isEmpty(expected)) return true;
-	return String(actual ?? "").toLowerCase() === String(expected ?? "").toLowerCase();
+	return asKey(actual) === asKey(expected);
 }
 
 function compareDates(actual: unknown, expected: unknown, op: string): boolean {
@@ -134,7 +135,7 @@ export function applySorts(
 			const isName = sort.property.trim().toLowerCase() === "name";
 			const prop = findProperty(schema, sort.property);
 			if (!prop && !isName) continue;
-			const descriptor = prop ?? ({ id: "name", name: "Name", type: "text" } as PropertyDef);
+			const descriptor: PropertyDef = prop ?? { id: "name", name: "Name", type: "text" };
 			const av = isName ? a.name : a.values[descriptor.id];
 			const bv = isName ? b.name : b.values[descriptor.id];
 			const cmp = compareValues(descriptor, av, bv);

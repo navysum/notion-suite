@@ -3,6 +3,32 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.2.1
+
+Pre-submission pass against `eslint-plugin-obsidianmd`, the linter the Obsidian
+community directory's review is based on. It found a real bug.
+
+### Fixed
+
+- **Deleting a row crashed on Obsidian 1.5.0 through 1.6.5.** The manifest
+  claimed support from 1.5.0, but row deletion uses `FileManager.trashFile`,
+  which only exists from 1.6.6. `minAppVersion` is now 1.6.6, which is what the
+  plugin has actually required all along.
+- **Values that were not plain text rendered as `[object Object]`.** Frontmatter
+  and block YAML are hand-written, so a key meant to hold a scalar can come back
+  as a map or nested list. Twenty-eight places converted such values with
+  `String()`, which would show, filter on, or chart that placeholder. They now
+  read as empty, which every caller already handles as "no value".
+- Two navigation calls could reject unobserved; a calendar click handler
+  returned a promise into a slot that ignored it.
+
+### Changed
+
+- `npm run lint` runs the directory's review rules, and CI runs it on every
+  push, so a regression cannot reach a release.
+- Dropped the `builtin-modules` dependency for the Node built-in it wrapped.
+- Settings headings use Obsidian's own heading control rather than raw `<h2>`.
+
 ## 1.2.0
 
 You should not have to memorise a configuration syntax to use a chart. This

@@ -1,4 +1,4 @@
-import { App, Menu, TFile } from "obsidian";
+import { App, Menu } from "obsidian";
 import { DatabaseStore } from "../db/store";
 import { DatabaseSchema } from "../types";
 
@@ -20,7 +20,7 @@ export function openRow(ctx: ViewContext, path: string, event?: MouseEvent): voi
 	const file = ctx.store.getFile(path);
 	if (!file) return;
 	const newLeaf = !!event && (event.ctrlKey || event.metaKey || event.button === 1);
-	ctx.app.workspace.getLeaf(newLeaf).openFile(file as TFile);
+	void ctx.app.workspace.getLeaf(newLeaf).openFile(file);
 }
 
 export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent): void {
@@ -37,7 +37,7 @@ export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent
 			.setIcon("separator-vertical")
 			.onClick(() => {
 				const file = ctx.store.getFile(path);
-				if (file) ctx.app.workspace.getLeaf(true).openFile(file);
+				if (file) void ctx.app.workspace.getLeaf(true).openFile(file);
 			})
 	);
 	menu.addSeparator();

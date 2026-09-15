@@ -4,6 +4,7 @@ import { ViewContext, openRow, rowContextMenu } from "./context";
 import { findProperty, groupRows } from "../db/query";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
+import { asText } from "../utils/text";
 import { createInlineRow } from "./table";
 
 /**
@@ -96,9 +97,8 @@ async function moveCard(
 		// A card can sit in several columns at once, so a move swaps just the
 		// column it was dragged from and leaves its other values intact.
 		const row = ctx.store.rows(ctx.schema).find((r) => r.path === path);
-		const current = Array.isArray(row?.values[groupProp.id])
-			? (row!.values[groupProp.id] as string[]).map(String)
-			: [];
+		const existing = row?.values[groupProp.id];
+		const current = Array.isArray(existing) ? (existing as unknown[]).map(asText) : [];
 		const remaining = current.filter((v) => v !== sourceKey);
 		value = targetKey === "" ? remaining : [...new Set([...remaining, targetKey])];
 	} else if (targetKey === "") {
@@ -170,9 +170,9 @@ function renderCard(
 
 export function coverUrl(ctx: ViewContext, row: DatabaseRow, propertyId: string): string | null {
 	const raw = row.values[propertyId];
-	const first = Array.isArray(raw) ? raw[0] : raw;
-	if (!first) return null;
-	const text = String(first);
+	const first = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
+	const text = asText(first);
+	if (!text) return null;
 	if (/^https?:\/\//.test(text)) return text;
 
 	// Otherwise treat it as a vault path or wikilink to an attachment.

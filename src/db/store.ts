@@ -234,13 +234,14 @@ export class DatabaseStore extends Events {
 					values[prop.id] = coerce(prop, (frontmatter as Record<string, unknown>)[prop.id]);
 				}
 			}
-			return {
+			const row: DatabaseRow = {
 				path: file.path,
 				name: file.basename,
 				values,
 				ctime: file.stat.ctime,
 				mtime: file.stat.mtime,
-			} as DatabaseRow;
+			};
+			return row;
 		});
 	}
 
@@ -269,7 +270,7 @@ export class DatabaseStore extends Events {
 		// Computed properties are derived on read; there is nothing to persist.
 		if (prop && DERIVED_TYPES.includes(prop.type)) return;
 
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+		await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 			if (value === null || value === undefined || value === "") delete frontmatter[propertyId];
 			else frontmatter[propertyId] = value;
 		});

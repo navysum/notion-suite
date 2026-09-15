@@ -1,5 +1,6 @@
 import { PropertyDef, DatabaseRow } from "../types";
 import { formatDate, parseDate, toISODate } from "../utils/dates";
+import { asText } from "../utils/text";
 
 /**
  * Coerce a raw frontmatter value into the shape the property type expects.
@@ -34,7 +35,7 @@ export function coerce(prop: PropertyDef, raw: unknown): unknown {
 					.filter((v) => v.length > 0);
 			}
 			if (raw === null || raw === undefined) return [];
-			return [String(raw)];
+			return [asText(raw)];
 		}
 		case "date": {
 			const d = parseDate(raw);
@@ -43,7 +44,7 @@ export function coerce(prop: PropertyDef, raw: unknown): unknown {
 		default: {
 			if (raw === null || raw === undefined) return null;
 			if (Array.isArray(raw)) return raw.join(", ");
-			return typeof raw === "string" ? raw : String(raw);
+			return typeof raw === "string" ? raw : asText(raw);
 		}
 	}
 }

@@ -74,9 +74,7 @@ export class PropertyModal extends Modal {
 		super(app);
 		this.isNew = existing === null;
 		this.originalType = existing ? existing.type : null;
-		this.draft = existing
-			? JSON.parse(JSON.stringify(existing))
-			: { id: "", name: "", type: "text" };
+		this.draft = existing ? structuredClone(existing) : { id: "", name: "", type: "text" };
 		this.optionsText = (this.draft.options ?? []).map((o) => o.name).join("\n");
 	}
 

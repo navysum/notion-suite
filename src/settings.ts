@@ -32,7 +32,7 @@ export class NotionSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Editing" });
+		new Setting(containerEl).setName("Editing").setHeading();
 
 		new Setting(containerEl)
 			.setName("Slash command menu")
@@ -69,7 +69,7 @@ export class NotionSettingTab extends PluginSettingTab {
 				})
 			);
 
-		containerEl.createEl("h2", { text: "Databases" });
+		new Setting(containerEl).setName("Databases").setHeading();
 
 		new Setting(containerEl)
 			.setName("Default folder")
@@ -111,7 +111,7 @@ export class NotionSettingTab extends PluginSettingTab {
 
 	private renderDatabaseList(containerEl: HTMLElement): void {
 		const databases = this.plugin.store.all();
-		containerEl.createEl("h3", { text: `Your databases (${databases.length})` });
+		new Setting(containerEl).setName(`Your databases (${databases.length})`).setHeading();
 
 		if (databases.length === 0) {
 			containerEl.createEl("p", {

@@ -173,7 +173,7 @@ export class NewDatabaseModal extends Modal {
 			icon: this.selected.icon,
 			description: this.selected.description,
 			// Clone the template's properties; they must not be shared by reference.
-			properties: JSON.parse(JSON.stringify(this.selected.properties)),
+			properties: structuredClone(this.selected.properties),
 		});
 
 		if (this.includeSamples) {

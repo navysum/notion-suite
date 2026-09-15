@@ -226,7 +226,7 @@ export default class NotionForObsidian extends Plugin {
 
 		this.addCommand({
 			id: "toggle-slash-menu",
-			name: "Toggle the slash command menu",
+			name: "Toggle the slash menu",
 			callback: async () => {
 				this.settings.enableSlashMenu = !this.settings.enableSlashMenu;
 				await this.saveSettings();
@@ -314,7 +314,8 @@ export default class NotionForObsidian extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const stored = (await this.loadData()) as Partial<NotionSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, stored ?? {});
 	}
 
 	async saveSettings(): Promise<void> {

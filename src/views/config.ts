@@ -10,6 +10,7 @@ import {
 	ViewType,
 	Aggregation,
 } from "../types";
+import { asKey, asText } from "../utils/text";
 
 /**
  * Filter shorthand, longest phrase first so that "is not empty" is never
@@ -85,7 +86,7 @@ export function parseSortShorthand(input: string): SortRule | null {
 }
 
 function toStringArray(value: unknown): string[] {
-	if (Array.isArray(value)) return value.map((v) => String(v));
+	if (Array.isArray(value)) return (value as unknown[]).map(asText).filter(Boolean);
 	if (typeof value === "string") {
 		return value
 			.split(",")
@@ -171,7 +172,7 @@ export function parseViewBlock(source: string): ParsedViewBlock {
 		return { config: null, error: "Missing `database:` — name the database this view should show." };
 	}
 
-	const requested = String(raw.view ?? raw.type ?? "table").toLowerCase();
+	const requested = asKey(raw.view ?? raw.type) || "table";
 	const type = (VIEW_TYPES.includes(requested as ViewType) ? requested : "table") as ViewType;
 
 	const sorts = toStringArray(raw.sort ?? raw.sorts)
@@ -180,12 +181,12 @@ export function parseViewBlock(source: string): ParsedViewBlock {
 
 	const config: ViewConfig = {
 		id: `inline-${type}`,
-		name: String(raw.title ?? raw.name ?? ""),
+		name: asText(raw.title ?? raw.name),
 		type,
-		databaseId: String(database),
-		groupBy: raw.group ? String(raw.group) : raw.groupBy ? String(raw.groupBy) : undefined,
-		dateProperty: raw.date ? String(raw.date) : undefined,
-		coverProperty: raw.cover ? String(raw.cover) : undefined,
+		databaseId: asText(database),
+		groupBy: asText(raw.group ?? raw.groupBy) || undefined,
+		dateProperty: asText(raw.date) || undefined,
+		coverProperty: asText(raw.cover) || undefined,
 		visibleProperties: toStringArray(raw.properties ?? raw.props ?? raw.columns),
 		filter: parseFilters(raw.filter ?? raw.filters ?? raw.where),
 		sorts: sorts.length > 0 ? sorts : undefined,
@@ -240,35 +241,35 @@ export function parseChartBlock(source: string): ParsedChartBlock {
 		};
 	}
 
-	const requestedKind = String(raw.chart ?? raw.kind ?? raw.type ?? "column").toLowerCase();
+	const requestedKind = asKey(raw.chart ?? raw.kind ?? raw.type) || "column";
 	const kind = (CHART_KINDS.includes(requestedKind as ChartKind)
 		? requestedKind
 		: "column") as ChartKind;
 
-	const requestedAgg = String(raw.aggregate ?? raw.aggregation ?? (raw.value ? "sum" : "count"))
-		.toLowerCase()
-		.replace(/\s+/g, "_");
+	const requestedAgg =
+		asKey(raw.aggregate ?? raw.aggregation).replace(/\s+/g, "_") ||
+		(raw.value ? "sum" : "count");
 	const aggregation = (AGGREGATIONS.includes(requestedAgg as Aggregation)
 		? requestedAgg
 		: "count") as Aggregation;
 
-	const sortRaw = String(raw.sort ?? "value_desc").toLowerCase();
+	const sortRaw = asKey(raw.sort) || "value_desc";
 	const sort = (["label", "value", "value_desc", "none"].includes(sortRaw)
 		? sortRaw
 		: "value_desc") as ChartConfig["sort"];
 
 	return {
 		config: {
-			database: String(database),
+			database: asText(database),
 			kind,
-			groupBy: String(groupBy),
-			value: raw.value ? String(raw.value) : undefined,
+			groupBy: asText(groupBy),
+			value: asText(raw.value) || undefined,
 			aggregation,
-			series: raw.series ? String(raw.series) : undefined,
+			series: asText(raw.series) || undefined,
 			filter: parseFilters(raw.filter ?? raw.filters ?? raw.where),
 			sort,
 			limit: raw.limit !== undefined ? Number(raw.limit) : undefined,
-			title: raw.title ? String(raw.title) : undefined,
+			title: asText(raw.title) || undefined,
 			height: raw.height !== undefined ? Number(raw.height) : undefined,
 			stacked: raw.stacked === true,
 			showLegend: raw.legend !== false,
