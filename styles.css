@@ -1530,3 +1530,99 @@ body.nfo-typography hr {
 
 .nfo-page-folder svg { width: 13px; height: 13px; }
 .nfo-page-body { margin-top: 6px; }
+
+/* --- Page icons and covers ------------------------------------------------ */
+
+.nfo-banner {
+	position: relative;
+	margin: -12px -24px 0;
+	overflow: hidden;
+	border-radius: 0;
+}
+
+.nfo-banner-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.nfo-page-emoji {
+	font-size: 3.4em;
+	line-height: 1;
+	margin-bottom: 6px;
+}
+
+/* An icon sitting on a cover overlaps it, the way Notion's does. */
+.nfo-page-emoji-over { margin-top: -46px; position: relative; }
+
+.nfo-emoji-picker {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	margin: -6px 0 14px;
+}
+
+.nfo-emoji-option {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	font-size: 1.25em;
+	border: 1px solid var(--nfo-border);
+	border-radius: var(--nfo-radius);
+	cursor: pointer;
+}
+
+.nfo-emoji-option:hover { background: var(--nfo-hover); border-color: var(--nfo-border-strong); }
+
+/* --- Table of contents and breadcrumb ------------------------------------- */
+
+.nfo-toc {
+	margin: 1em 0;
+	padding: 12px 14px;
+	border-left: 2px solid var(--nfo-border-strong);
+	background: var(--nfo-surface-alt);
+	border-radius: 0 var(--nfo-radius-lg) var(--nfo-radius-lg) 0;
+}
+
+.nfo-toc-entry { padding: 2px 0; line-height: 1.5; }
+
+.nfo-toc-link { cursor: pointer; color: var(--link-color); }
+.nfo-toc-link:hover { text-decoration: underline; }
+.nfo-toc-empty { color: var(--nfo-muted); font-style: italic; font-size: 0.9em; }
+
+.nfo-breadcrumb {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+	margin: 0.6em 0;
+	font-size: 0.86em;
+	color: var(--nfo-muted);
+}
+
+.nfo-crumb { display: inline-flex; align-items: center; }
+.nfo-crumb svg { width: 14px; height: 14px; }
+.nfo-crumb-sep { opacity: 0.45; }
+.nfo-crumb-current { color: var(--text-normal); font-weight: 500; }
+
+/* --- Toggle headings ------------------------------------------------------ */
+
+/* Callouts carrying heading weight, so a foldable section reads as a heading
+   rather than as a note box. */
+.callout[data-callout="nfo-h1"],
+.callout[data-callout="nfo-h2"],
+.callout[data-callout="nfo-h3"] {
+	background: transparent;
+	border: none;
+	padding: 2px 0;
+	margin: 0.8em 0 0.2em;
+}
+
+.callout[data-callout="nfo-h1"] .callout-icon,
+.callout[data-callout="nfo-h2"] .callout-icon,
+.callout[data-callout="nfo-h3"] .callout-icon { display: none; }
+
+.callout[data-callout="nfo-h1"] .callout-title { font-size: 1.75em; font-weight: 700; }
+.callout[data-callout="nfo-h2"] .callout-title { font-size: 1.4em; font-weight: 600; }
+.callout[data-callout="nfo-h3"] .callout-title { font-size: 1.15em; font-weight: 600; }
+
+.callout[data-callout^="nfo-h"] .callout-title { padding: 0; color: var(--text-normal); }
+.callout[data-callout^="nfo-h"] .callout-content { padding-left: 2px; }

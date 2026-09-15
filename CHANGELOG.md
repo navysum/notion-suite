@@ -3,6 +3,36 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.6.0
+
+Notion Suite stops being a set of code blocks and starts being a workspace.
+
+### Added
+
+- **A databases sidebar.** Every database in one place, with a live row count,
+  opening on click. Until now a database only existed where you had pasted a
+  block, so forgetting which note held it effectively lost it.
+- **Full-page databases.** Open one as its own tab, with a view switcher across
+  the top and no code block anywhere. Blocks keep their job of embedding a view
+  inside a note; they stop being the only way in.
+- **Page icons and covers.** `icon: 🚀` and `cover:` in a note's frontmatter,
+  set from a dialog rather than typed. Probably the single biggest reason
+  Notion *looks* like Notion.
+- **Nested filters** — `Status is not Done and (Priority is High or Urgent)`,
+  three levels deep, written inline or as `any`/`all` objects.
+- **Sub-items.** Rows nest under a parent, with a fold arrow. The parent link
+  is an ordinary relation property, so the hierarchy lives in the note.
+- **Bulk editing.** Tick rows, set one property across all of them at once.
+- **Unique IDs** — `TASK-1`, `TASK-2`, assigned at creation and stable for the
+  row's life, with a command to backfill rows that predate the property.
+- **Per-view hidden properties.** Hiding a property in one view no longer hides
+  it everywhere.
+- **Board sub-grouping**, **collapsible columns**, **column limits** that colour
+  the count when exceeded, **date bucketing** (Overdue / Today / This week /
+  Next week / Later), and **manual card order** you can drag within a column.
+- **Table of contents** and **breadcrumb** blocks, **toggle headings**, and
+  commands for page style and toggling a row's checkbox.
+
 ## 1.5.0
 
 The biggest release so far: real formulas, a timeline view, column footers, a
