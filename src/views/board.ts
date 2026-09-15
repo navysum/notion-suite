@@ -1,4 +1,4 @@
-import { Menu, setIcon } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { ViewContext, openRow, rowContextMenu } from "./context";
 import { findProperty, groupRows, RowGroup } from "../db/query";
@@ -6,7 +6,8 @@ import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
 import { asText } from "../utils/text";
 import { createInlineRow, renderTemplatePicker } from "./table";
-import { positionFor, sortByOrder } from "../db/order";
+import { DEFAULT_ORDER_PROPERTY, positionFor, seedPositions, sortByOrder } from "../db/order";
+import { confirm } from "../ui/confirmModal";
 
 /**
  * Kanban board. Cards are dragged between columns; dropping writes the new
@@ -82,7 +83,7 @@ export function renderBoard(
 			if (!path || !groupProp) return;
 			const from = evt.dataTransfer?.getData("text/nfo-group") ?? "";
 			// Dropping on the column body, past the cards, means "last".
-			void moveCard(ctx, path, groupProp, from, group.key, group.rows, group.rows.length);
+			void moveCard(ctx, path, groupProp, from, group.key, group.rows, group.rows.length, view);
 		});
 
 		const subKey = view.subGroupBy;
@@ -170,6 +171,26 @@ function columnMenu(
 				.onClick(() => setLimit(ctx, view, group.key, null))
 		);
 	}
+
+	menu.addSeparator();
+	const mode = view.limitMode ?? "soft";
+	const modes: Array<[NonNullable<ViewConfig["limitMode"]>, string]> = [
+		["soft", "Limits just colour the count"],
+		["ask", "Limits ask before going over"],
+		["strict", "Limits hold the line"],
+	];
+	for (const [value, label] of modes) {
+		menu.addItem((item) =>
+			item
+				.setTitle(label)
+				.setChecked(mode === value)
+				.onClick(() => {
+					view.limitMode = value;
+					if (ctx.persistKey) ctx.persistKey("limit_mode", value);
+					else ctx.refresh();
+				})
+		);
+	}
 	menu.showAtMouseEvent(evt);
 }
 
@@ -188,6 +209,48 @@ function setLimit(
 	else ctx.refresh();
 }
 
+/**
+ * Decide whether a card may land in a column that is at its limit.
+ *
+ * A limit is a statement about how much work should be in progress, and what
+ * to do when reality exceeds it is a judgement only the user can make: some
+ * people want the board to hold the line, others want it to reflect the day
+ * they are actually having. So the board does not decide -- it defaults to
+ * letting the drop through and colouring the count, and the other two
+ * behaviours are a per-view setting.
+ */
+async function allowedByLimit(
+	ctx: ViewContext,
+	view: ViewConfig,
+	targetKey: string
+): Promise<boolean> {
+	const mode = view.limitMode ?? "soft";
+	if (mode === "soft") return true;
+
+	const limit = view.limits?.[targetKey];
+	if (!limit) return true;
+
+	const groupKey = view.groupBy;
+	if (!groupKey) return true;
+	const current =
+		groupRows(ctx.schema, ctx.store.rows(ctx.schema), groupKey, {
+			dateBuckets: view.dateBuckets,
+		}).find((group) => group.key === targetKey)?.rows.length ?? 0;
+	if (current < limit) return true;
+
+	if (mode === "strict") {
+		new Notice(`“${targetKey || "No value"}” is full at ${limit}. Finish something first.`);
+		return false;
+	}
+
+	return confirm(ctx.app, {
+		title: "Over the limit",
+		body: `“${targetKey || "No value"}” already holds ${current}, and its limit is ${limit}.`,
+		detail: "Limits are a reminder, not a rule. Moving it anyway is fine.",
+		confirmText: "Move it anyway",
+	});
+}
+
 async function moveCard(
 	ctx: ViewContext,
 	path: string,
@@ -195,13 +258,16 @@ async function moveCard(
 	sourceKey: string,
 	targetKey: string,
 	siblings: DatabaseRow[] = [],
-	index = -1
+	index = -1,
+	view?: ViewConfig
 ): Promise<void> {
 	// Reordering within one column is a position change, not a group change.
 	if (sourceKey === targetKey) {
 		if (index >= 0) await reorderWithin(ctx, path, siblings, index);
 		return;
 	}
+
+	if (view && !(await allowedByLimit(ctx, view, targetKey))) return;
 
 	let value: unknown;
 	if (groupProp.type === "multiselect") {
@@ -226,19 +292,55 @@ async function moveCard(
 }
 
 /**
- * Write a row's new position, plus any respacing the move forced.
+ * Make sure the database can store a manual order, asking once if it cannot.
  *
- * Does nothing at all when the database has no order property: manual order
- * costs a property, and silently creating one behind the user's back would
- * write to every note in the database.
+ * Manual order needs somewhere durable to live, and on a folder-of-notes model
+ * that is the note. Rather than making the user find that out and set it up
+ * first, the first drag offers to do it: one confirmation, then dragging works
+ * from then on. The property is hidden, because a position is presentation and
+ * nobody wants it occupying a column.
  */
+async function ensureOrderProperty(ctx: ViewContext): Promise<string | null> {
+	if (ctx.schema.orderProperty) return ctx.schema.orderProperty;
+
+	const ok = await confirm(ctx.app, {
+		title: "Remember this order?",
+		body:
+			`Dragging cards into an order needs somewhere to keep each card's position, ` +
+			`so “${ctx.schema.name}” would gain a hidden Order property.`,
+		detail:
+			"It is an ordinary number in each note's frontmatter, so the order survives " +
+			"without this plugin. It stays hidden from your views.",
+		confirmText: "Add it and reorder",
+	});
+	if (!ok) return null;
+
+	// Do not collide with a property the user already has.
+	const taken = new Set(ctx.schema.properties.map((p) => p.id));
+	const prop = { ...DEFAULT_ORDER_PROPERTY };
+	while (taken.has(prop.id)) prop.id = `${DEFAULT_ORDER_PROPERTY.id}_${Math.floor(Math.random() * 1000)}`;
+
+	await ctx.store.updateDatabase(ctx.schema.id, (schema) => {
+		schema.properties.push(prop);
+		schema.orderProperty = prop.id;
+	});
+
+	// Give the existing rows spaced positions, so the first drop has gaps to
+	// aim at instead of a column that is all zeroes.
+	for (const entry of seedPositions(ctx.store.rows(ctx.schema))) {
+		await ctx.store.setValue(ctx.schema, entry.row.path, prop.id, entry.value);
+	}
+	return prop.id;
+}
+
+/** Write a row's new position, plus any respacing the move forced. */
 async function reorderWithin(
 	ctx: ViewContext,
 	path: string,
 	siblings: DatabaseRow[],
 	index: number
 ): Promise<void> {
-	const orderKey = ctx.schema.orderProperty;
+	const orderKey = await ensureOrderProperty(ctx);
 	if (!orderKey) return;
 	const moving = ctx.store.rows(ctx.schema).find((row) => row.path === path);
 	if (!moving) return;
@@ -274,7 +376,7 @@ function renderCard(
 
 	// Dropping onto a card inserts relative to it, which is what makes
 	// reordering inside a column possible at all.
-	if (ctx.schema.orderProperty) {
+	{
 		card.addEventListener("dragover", (evt) => {
 			evt.preventDefault();
 			evt.stopPropagation();
@@ -295,7 +397,7 @@ function renderCard(
 			if (!moved || !groupProp) return;
 			const rect = card.getBoundingClientRect();
 			const below = evt.clientY > rect.top + rect.height / 2;
-			void moveCard(ctx, moved, groupProp, from, groupKey, siblings, position + (below ? 1 : 0));
+			void moveCard(ctx, moved, groupProp, from, groupKey, siblings, position + (below ? 1 : 0), view);
 		});
 	}
 

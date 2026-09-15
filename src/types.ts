@@ -299,6 +299,12 @@ export interface ViewConfig {
 	collapsedGroups?: string[];
 	/** Board: per-column card limits. A column over its limit reads as over. */
 	limits?: Record<string, number>;
+	/**
+	 * Board: what a limit means when a drop would exceed it.
+	 * `soft` colours the count and lets the drop through; `ask` confirms first;
+	 * `strict` refuses. Defaults to `soft`.
+	 */
+	limitMode?: "soft" | "ask" | "strict";
 	/** Board: bucket a date grouping into overdue/today/this week/later. */
 	dateBuckets?: boolean;
 }

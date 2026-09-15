@@ -7,7 +7,7 @@ import { seedFrontmatter } from "../src/db/store";
 import { calculateColumn, calculationsFor, formatCalculation } from "../src/db/calculate";
 import { groupRows } from "../src/db/query";
 import { buildTree, descendantsOf } from "../src/db/tree";
-import { positionFor, sortByOrder } from "../src/db/order";
+import { DEFAULT_ORDER_PROPERTY, positionFor, seedPositions, sortByOrder } from "../src/db/order";
 import { formatValue, compareValues } from "../src/db/value";
 import { DatabaseRow, DatabaseSchema, PropertyDef, ROLLUP_TITLE_KEY } from "../src/types";
 
@@ -616,6 +616,21 @@ test("moving a row within its own column ignores its old position", () => {
 	const c = row("C", { pos: 300 });
 	// Drag A to the end: it should land past C, not stay at 100.
 	assert.equal(positionFor(ordered, [a, b, c], 2, a).value, 400);
+});
+
+test("seedPositions spaces an existing column so a first drop has gaps to aim at", () => {
+	const list = [row("A", {}), row("B", {}), row("C", {})];
+	assert.deepEqual(seedPositions(list).map((e) => e.value), [100, 200, 300]);
+	// Every gap is wide enough to insert into without respacing.
+	const seeded = seedPositions(list);
+	for (let i = 1; i < seeded.length; i++) {
+		assert.ok(seeded[i].value - seeded[i - 1].value > 1);
+	}
+});
+
+test("the default order property is hidden, since a position is not content", () => {
+	assert.equal(DEFAULT_ORDER_PROPERTY.hidden, true);
+	assert.equal(DEFAULT_ORDER_PROPERTY.type, "number");
 });
 
 // --- presentation ----------------------------------------------------------
