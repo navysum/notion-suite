@@ -39,6 +39,7 @@ export function renderCell(
 			renderCheckbox(container, ctx, row, prop, value);
 			break;
 		case "select":
+		case "status":
 			renderSelect(container, ctx, row, prop, value);
 			break;
 		case "multiselect":

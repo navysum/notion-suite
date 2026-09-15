@@ -311,7 +311,7 @@ export class InsertViewModal extends Modal {
 
 		if (this.viewType === "board") {
 			const groupable = schema.properties.filter((p) =>
-				["select", "multiselect", "checkbox"].includes(p.type)
+				["status", "select", "multiselect", "checkbox"].includes(p.type)
 			);
 			this.groupBy = this.groupBy || groupable[0]?.id || "";
 			new Setting(parent)

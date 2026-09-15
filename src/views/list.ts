@@ -3,7 +3,7 @@ import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { ViewContext, openRow, rowContextMenu } from "./context";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
-import { createInlineRow } from "./table";
+import { createInlineRow, renderTemplatePicker } from "./table";
 
 export function renderList(
 	container: HTMLElement,
@@ -40,7 +40,7 @@ export function renderList(
 		for (const prop of properties.filter((p) => p.type !== "checkbox").slice(0, 3)) {
 			const value = row.values[prop.id];
 			if (isEmpty(value)) continue;
-			if (prop.type === "select") {
+			if (prop.type === "select" || prop.type === "status") {
 				const option = ctx.store.optionFor(prop, String(value));
 				pill(meta, String(value), option?.color ?? autoColor(String(value)));
 			} else if (prop.type === "multiselect") {
@@ -59,6 +59,7 @@ export function renderList(
 	const add = list.createDiv({ cls: "nfo-list-add" });
 	setIcon(add.createSpan(), "plus");
 	add.createSpan({ text: "New" });
+	renderTemplatePicker(add, ctx, view);
 	add.addEventListener("click", () => void createInlineRow(ctx, view));
 
 	if (rows.length === 0) {

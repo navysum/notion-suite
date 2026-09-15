@@ -7,6 +7,7 @@ import {
 	SortRule,
 } from "../types";
 import { compareValues, isEmpty } from "./value";
+import { SelectOption } from "../types";
 import { parseDate } from "../utils/dates";
 import { asKey } from "../utils/text";
 
@@ -146,6 +147,16 @@ export function applySorts(
 	return sorted;
 }
 
+/** Order status options to-do first, complete last. */
+function byStage(prop: PropertyDef): (a: SelectOption, b: SelectOption) => number {
+	const rank: Record<string, number> = { todo: 0, doing: 1, done: 2 };
+	return (a, b) => {
+		const sa = rank[prop.statusStages?.[a.name] ?? "todo"] ?? 0;
+		const sb = rank[prop.statusStages?.[b.name] ?? "todo"] ?? 0;
+		return sa - sb;
+	};
+}
+
 export interface RowGroup {
 	key: string;
 	label: string;
@@ -169,9 +180,14 @@ export function groupRows(
 		else buckets.set(key, [row]);
 	};
 
-	// Seed with the configured options so empty columns still render.
+	// Seed with the configured options so empty columns still render. A status
+	// property seeds in stage order (to do, in progress, complete) rather than
+	// the order its options happen to be listed in -- that ordering is the
+	// whole reason the type exists.
 	if (prop?.options) {
-		for (const option of prop.options) buckets.set(option.name, []);
+		const ordered =
+			prop.type === "status" ? [...prop.options].sort(byStage(prop)) : prop.options;
+		for (const option of ordered) buckets.set(option.name, []);
 	}
 
 	for (const row of rows) {

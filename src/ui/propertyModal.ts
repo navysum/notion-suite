@@ -10,6 +10,8 @@ import {
 	ROLLUP_FUNCTION_LABELS,
 	ROLLUP_TITLE_KEY,
 	RollupFunction,
+	SelectOption,
+	StatusStage,
 } from "../types";
 import { autoColor } from "../utils/dom";
 
@@ -33,6 +35,13 @@ function selectOption(
 		: (options[0]?.[0] ?? "");
 	dropdown.setValue(resolved);
 	return resolved;
+}
+
+/** Stage colours follow the traffic-light reading of a board. */
+function stageColor(stage: StatusStage): SelectOption["color"] {
+	if (stage === "done") return "green";
+	if (stage === "doing") return "blue";
+	return "gray";
 }
 
 /** Turn a display name into a frontmatter key. */
@@ -133,6 +142,22 @@ export class PropertyModal extends Modal {
 	private renderTypeOptions(parent: HTMLElement): void {
 		parent.empty();
 		const type = this.draft.type;
+
+		if (type === "status") {
+			new Setting(parent)
+				.setName("Options")
+				.setDesc(
+					"One per line. Prefix with a stage to group them: " +
+						"“todo: Not started”, “doing: In progress”, “done: Shipped”. " +
+						"Boards order their columns by that stage."
+				)
+				.addTextArea((area) =>
+					area
+						.setValue(this.statusText())
+						.setPlaceholder("todo: Not started\ndoing: In progress\ndone: Complete")
+						.onChange((value) => (this.optionsText = value))
+				);
+		}
 
 		if (type === "select" || type === "multiselect") {
 			new Setting(parent)
@@ -283,7 +308,24 @@ export class PropertyModal extends Modal {
 			return;
 		}
 
-		if (this.draft.type === "select" || this.draft.type === "multiselect") {
+		if (this.draft.type === "status") {
+			const existing = new Map((this.draft.options ?? []).map((o) => [o.name, o]));
+			const stages: Record<string, StatusStage> = {};
+			const options: SelectOption[] = [];
+			for (const line of this.optionsText.split("\n")) {
+				const text = line.trim();
+				if (!text) continue;
+				// "stage: Name", or a bare name that defaults to the to-do stage.
+				const match = text.match(/^(todo|doing|done)\s*:\s*(.+)$/i);
+				const stage = (match ? match[1].toLowerCase() : "todo") as StatusStage;
+				const name = match ? match[2].trim() : text;
+				if (!name) continue;
+				stages[name] = stage;
+				options.push(existing.get(name) ?? { name, color: stageColor(stage) });
+			}
+			this.draft.options = options;
+			this.draft.statusStages = stages;
+		} else if (this.draft.type === "select" || this.draft.type === "multiselect") {
 			const existing = new Map((this.draft.options ?? []).map((o) => [o.name, o]));
 			this.draft.options = this.optionsText
 				.split("\n")
@@ -314,6 +356,14 @@ export class PropertyModal extends Modal {
 
 		this.close();
 		this.onDone();
+	}
+
+	/** Render existing status options back as "stage: Name" lines. */
+	private statusText(): string {
+		if (this.optionsText && this.optionsText.includes(":")) return this.optionsText;
+		return (this.draft.options ?? [])
+			.map((option) => `${this.draft.statusStages?.[option.name] ?? "todo"}: ${option.name}`)
+			.join("\n");
 	}
 
 	private findExisting(): PropertyDef | undefined {

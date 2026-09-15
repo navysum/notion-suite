@@ -4,6 +4,8 @@ import test from "node:test";
 import { collapse, computeRollup, gatherValues, indexByName, relatedRows } from "../src/db/rollup";
 import { RowResolver, ResolverSource } from "../src/db/resolve";
 import { seedFrontmatter } from "../src/db/store";
+import { calculateColumn, calculationsFor, formatCalculation } from "../src/db/calculate";
+import { groupRows } from "../src/db/query";
 import { formatValue, compareValues } from "../src/db/value";
 import { DatabaseRow, DatabaseSchema, PropertyDef, ROLLUP_TITLE_KEY } from "../src/types";
 
@@ -410,6 +412,75 @@ test("min, max and range survive a gather too large to spread as arguments", () 
 	);
 	assert.equal(collapse(dates, dates.length, "earliest"), "2020-01-01");
 	assert.equal(collapse(dates, dates.length, "latest"), "2020-12-30");
+});
+
+// --- column footers --------------------------------------------------------
+
+test("calculateColumn aggregates down a column over the rows given", () => {
+	const hours: PropertyDef = { id: "hours", name: "Hours", type: "number" };
+	const shown = [row("A", { hours: 3 }), row("B", { hours: 5 })];
+	assert.equal(calculateColumn(shown, hours, "sum"), 8);
+	assert.equal(calculateColumn(shown, hours, "average"), 4);
+	// The footer must reflect the filtered view, not the whole database.
+	assert.equal(calculateColumn([shown[0]], hours, "sum"), 3);
+	assert.equal(calculateColumn([], hours, "sum"), null);
+});
+
+test("calculateColumn counts a list property's values, not just its rows", () => {
+	const tags: PropertyDef = { id: "tags", name: "Tags", type: "multiselect" };
+	const shown = [row("A", { tags: ["x", "y"] }), row("B", { tags: [] })];
+	assert.equal(calculateColumn(shown, tags, "count_all"), 2);
+	assert.equal(calculateColumn(shown, tags, "count_values"), 3);
+	assert.equal(calculateColumn(shown, tags, "count_not_empty"), 2);
+});
+
+test("calculationsFor offers only calculations that suit the property type", () => {
+	const number = calculationsFor({ id: "n", name: "N", type: "number" });
+	assert.ok(number.includes("sum") && number.includes("average"));
+
+	const date = calculationsFor({ id: "d", name: "D", type: "date" });
+	assert.ok(date.includes("earliest") && date.includes("latest"));
+	assert.ok(!date.includes("sum"), "summing dates is meaningless");
+
+	const check = calculationsFor({ id: "c", name: "C", type: "checkbox" });
+	assert.ok(check.includes("percent_checked"));
+
+	// Every type can at least be counted.
+	for (const type of ["text", "url", "person", "select"] as const) {
+		assert.ok(calculationsFor({ id: "x", name: "X", type }).includes("count_all"));
+	}
+});
+
+test("formatCalculation renders each result shape", () => {
+	assert.equal(formatCalculation("sum", 12.345), "12.35");
+	assert.equal(formatCalculation("percent_checked", 50), "50%");
+	assert.equal(formatCalculation("date_range", 7), "7 days");
+	assert.equal(formatCalculation("earliest", "2026-01-10"), "2026-01-10");
+	assert.equal(formatCalculation("sum", null), "—");
+});
+
+// --- status ----------------------------------------------------------------
+
+test("board columns follow status stage order, not option order", () => {
+	const statusSchema: DatabaseSchema = {
+		...tasks,
+		properties: [
+			{
+				id: "state",
+				name: "State",
+				type: "status",
+				// Deliberately listed out of order.
+				options: [
+					{ name: "Shipped", color: "green" },
+					{ name: "Backlog", color: "gray" },
+					{ name: "Building", color: "blue" },
+				],
+				statusStages: { Shipped: "done", Backlog: "todo", Building: "doing" },
+			},
+		],
+	};
+	const groups = groupRows(statusSchema, [], "state");
+	assert.deepEqual(groups.map((g) => g.key), ["Backlog", "Building", "Shipped"]);
 });
 
 // --- presentation ----------------------------------------------------------

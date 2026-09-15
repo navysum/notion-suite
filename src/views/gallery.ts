@@ -41,7 +41,7 @@ export function renderGallery(
 		for (const prop of properties.filter((p) => p.id !== coverProp).slice(0, 3)) {
 			const value = row.values[prop.id];
 			if (isEmpty(value) && prop.type !== "checkbox") continue;
-			if (prop.type === "select") {
+			if (prop.type === "select" || prop.type === "status") {
 				const option = ctx.store.optionFor(prop, String(value));
 				pill(meta, String(value), option?.color ?? autoColor(String(value)));
 			} else if (prop.type === "multiselect") {
