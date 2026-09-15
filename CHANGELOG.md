@@ -3,6 +3,24 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.6.1
+
+Both trade-offs from 1.6.0 turned into choices rather than constraints.
+
+### Changed
+
+- **Dragging cards into an order now sets itself up.** Manual ordering still
+  keeps each position in the note, because that is the only durable place on a
+  folder-of-notes model — but the first drag offers to add the property for
+  you, in one click, instead of failing silently until you found the setting.
+  The property is hidden, since a position is presentation rather than content,
+  and existing rows are given spaced positions so the first drop has gaps to
+  aim at.
+- **Column limits no longer have one fixed meaning.** What to do when a drop
+  would exceed a limit is a judgement only you can make, so a board offers all
+  three: colour the count and allow it (the default), ask first, or hold the
+  line. Set it from the column menu.
+
 ## 1.6.0
 
 Notion Suite stops being a set of code blocks and starts being a workspace.

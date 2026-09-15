@@ -1,4 +1,4 @@
-import { DatabaseRow, DatabaseSchema, ORDER_STEP } from "../types";
+import { DatabaseRow, DatabaseSchema, ORDER_STEP, PropertyDef } from "../types";
 
 /**
  * Manual ordering.
@@ -10,6 +10,24 @@ import { DatabaseRow, DatabaseSchema, ORDER_STEP } from "../types";
  * Positions are spaced rather than consecutive, so dropping a card between two
  * others usually rewrites one note instead of renumbering the column.
  */
+
+/** The property a database gets when manual ordering is switched on. */
+export const DEFAULT_ORDER_PROPERTY: PropertyDef = {
+	id: "nfo_order",
+	name: "Order",
+	type: "number",
+	// Hidden by default: a position is presentation, not something anyone wants
+	// occupying a column in every view.
+	hidden: true,
+};
+
+/**
+ * Seed positions for a column that has none yet, so the first drag has
+ * something to insert between rather than a column of identical zeroes.
+ */
+export function seedPositions(rows: DatabaseRow[]): Array<{ row: DatabaseRow; value: number }> {
+	return rows.map((row, index) => ({ row, value: (index + 1) * ORDER_STEP }));
+}
 
 export function orderOf(schema: DatabaseSchema, row: DatabaseRow): number {
 	if (!schema.orderProperty) return 0;

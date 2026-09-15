@@ -329,6 +329,9 @@ export function parseViewBlock(source: string): ParsedViewBlock {
 		subGroupBy: asText(raw.subgroup ?? raw.subGroupBy) || undefined,
 		collapsedGroups: toStringArray(raw.collapsed),
 		limits: parseLimits(raw.limits),
+		limitMode: ["soft", "ask", "strict"].includes(asKey(raw.limit_mode))
+			? (asKey(raw.limit_mode) as "soft" | "ask" | "strict")
+			: undefined,
 		dateBuckets: raw.buckets === true || asKey(raw.group_by) === "date",
 		timelineStart: asText(raw.start ?? raw.timelineStart) || undefined,
 		timelineEnd: asText(raw.end ?? raw.timelineEnd) || undefined,
