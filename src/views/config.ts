@@ -11,6 +11,9 @@ import {
 	Aggregation,
 	RollupFunction,
 	ROLLUP_FUNCTIONS,
+	FilterNode,
+	MAX_FILTER_DEPTH,
+	isFilterGroup,
 } from "../types";
 import { asKey, asText } from "../utils/text";
 
@@ -98,25 +101,113 @@ function toStringArray(value: unknown): string[] {
 	return [];
 }
 
-function parseFilters(raw: unknown): FilterGroup | undefined {
-	if (!raw) return undefined;
+/**
+ * Parse one entry of a filter list.
+ *
+ * An entry is either a rule in plain English, a parenthesised expression, or
+ * a nested `{any: [...]}` / `{all: [...]}` object. Depth is capped so a
+ * pathological block cannot recurse without end.
+ */
+function parseFilterNode(raw: unknown, depth: number): FilterNode | null {
+	if (depth > MAX_FILTER_DEPTH) return null;
 
-	// Object form: `filter: {any: [...]}` or `{all: [...]}`.
-	if (!Array.isArray(raw) && typeof raw === "object") {
+	if (raw && typeof raw === "object" && !Array.isArray(raw)) {
 		const obj = raw as Record<string, unknown>;
 		const any = obj.any ?? obj.or;
 		const all = obj.all ?? obj.and;
-		const conjunction: "and" | "or" = any ? "or" : "and";
-		const rules = toStringArray(any ?? all)
-			.map(parseFilterShorthand)
-			.filter((r): r is FilterRule => r !== null);
-		return rules.length > 0 ? { conjunction, rules } : undefined;
+		const source = any ?? all;
+		if (source === undefined) return null;
+		const conjunction: "and" | "or" = any !== undefined ? "or" : "and";
+		const rules = (Array.isArray(source) ? (source as unknown[]) : [source])
+			.map((child) => parseFilterNode(child, depth + 1))
+			.filter((node): node is FilterNode => node !== null);
+		return rules.length > 0 ? { conjunction, rules } : null;
 	}
 
-	const rules = toStringArray(raw)
-		.map(parseFilterShorthand)
-		.filter((r): r is FilterRule => r !== null);
-	return rules.length > 0 ? { conjunction: "and", rules } : undefined;
+	const text = asText(raw).trim();
+	if (!text) return null;
+	// `(A or B)` and `A and (B or C)` written inline.
+	const inline = parseInlineGroup(text, depth);
+	if (inline) return inline;
+	return parseFilterShorthand(text);
+}
+
+/**
+ * Parse an inline boolean expression such as `(Priority is High or Priority is
+ * Urgent)`, splitting on the top-level connective only so that a nested group
+ * is handed to the next level down intact.
+ */
+function parseInlineGroup(text: string, depth: number): FilterNode | null {
+	if (depth > MAX_FILTER_DEPTH) return null;
+
+	let body = text.trim();
+	// Peel one fully-wrapping pair of brackets: "(A or B)" -> "A or B".
+	while (body.startsWith("(") && matchingParen(body, 0) === body.length - 1) {
+		body = body.slice(1, -1).trim();
+	}
+
+	for (const conjunction of ["or", "and"] as const) {
+		const parts = splitTopLevel(body, conjunction);
+		if (parts.length < 2) continue;
+		const rules = parts
+			.map((part) => parseFilterNode(part, depth + 1))
+			.filter((node): node is FilterNode => node !== null);
+		if (rules.length >= 2) return { conjunction, rules };
+	}
+
+	return body === text.trim() ? null : parseFilterShorthand(body);
+}
+
+/** Index of the bracket closing the one at `from`, or -1. */
+function matchingParen(text: string, from: number): number {
+	let depth = 0;
+	for (let i = from; i < text.length; i++) {
+		if (text[i] === "(") depth++;
+		else if (text[i] === ")") {
+			depth--;
+			if (depth === 0) return i;
+		}
+	}
+	return -1;
+}
+
+/** Split on a connective, ignoring occurrences inside brackets. */
+function splitTopLevel(text: string, conjunction: "and" | "or"): string[] {
+	const parts: string[] = [];
+	const needle = ` ${conjunction} `;
+	let depth = 0;
+	let start = 0;
+	const lower = text.toLowerCase();
+	for (let i = 0; i < text.length; i++) {
+		if (text[i] === "(") depth++;
+		else if (text[i] === ")") depth--;
+		else if (depth === 0 && lower.startsWith(needle, i)) {
+			parts.push(text.slice(start, i).trim());
+			i += needle.length - 1;
+			start = i + 1;
+		}
+	}
+	parts.push(text.slice(start).trim());
+	return parts.filter(Boolean);
+}
+
+function parseFilters(raw: unknown): FilterGroup | undefined {
+	if (!raw) return undefined;
+
+	if (!Array.isArray(raw) && typeof raw === "object") {
+		const node = parseFilterNode(raw, 0);
+		if (!node) return undefined;
+		return isFilterGroup(node) ? node : { conjunction: "and", rules: [node] };
+	}
+
+	const rules = (Array.isArray(raw) ? (raw as unknown[]) : [raw])
+		.map((entry) => parseFilterNode(entry, 0))
+		.filter((node): node is FilterNode => node !== null);
+	if (rules.length === 0) return undefined;
+	// One entry that is already a group is the filter; wrapping it in another
+	// AND group would add a level that means nothing.
+	if (rules.length === 1 && isFilterGroup(rules[0])) return rules[0];
+	return { conjunction: "and", rules };
 }
 
 /** Inverse of `parseFilterShorthand`, for showing a saved filter in the editor. */
@@ -144,10 +235,29 @@ export function ruleToText(rule: FilterRule): string {
 	return rule.value === undefined ? head : `${head} ${rule.value}`;
 }
 
-/** Render a whole filter group as one rule per line. */
+/**
+ * Render a filter tree as text.
+ *
+ * A flat AND group is one rule per line, which is what most filters are and
+ * what the settings dialog shows. A nested group becomes a parenthesised
+ * expression on one line, so it survives a round trip through the editor.
+ */
 export function filterToText(group: FilterGroup | undefined): string {
 	if (!group) return "";
-	return group.rules.map(ruleToText).join("\n");
+	if (group.rules.every((node) => !isFilterGroup(node)) && group.conjunction === "and") {
+		return group.rules.map((node) => ruleToText(node as FilterRule)).join("\n");
+	}
+	// Anything else goes on ONE line. Splitting it across lines and prefixing
+	// the connective would not parse back: each line is read as an independent
+	// rule, so a leading "and (...)" becomes a nonsense rule and the filter
+	// silently starts matching different rows.
+	return group.rules.map(nodeToText).join(` ${group.conjunction} `);
+}
+
+function nodeToText(node: FilterNode): string {
+	if (!isFilterGroup(node)) return ruleToText(node);
+	const inner = node.rules.map(nodeToText).join(` ${node.conjunction} `);
+	return `(${inner})`;
 }
 
 const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar", "timeline"];
@@ -204,6 +314,7 @@ export function parseViewBlock(source: string): ParsedViewBlock {
 		filter: parseFilters(raw.filter ?? raw.filters ?? raw.where),
 		sorts: sorts.length > 0 ? sorts : undefined,
 		calculate: parseCalculations(raw.calculate),
+		hiddenProperties: toStringArray(raw.hide ?? raw.hidden),
 		timelineStart: asText(raw.start ?? raw.timelineStart) || undefined,
 		timelineEnd: asText(raw.end ?? raw.timelineEnd) || undefined,
 		timelineScale: ["day", "week", "month"].includes(asKey(raw.scale))

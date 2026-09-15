@@ -9,7 +9,7 @@ import {
 	calculationsFor,
 	formatCalculation,
 } from "../db/calculate";
-import { RollupFunction, RowTemplate } from "../types";
+import { RollupFunction, RowTemplate, isFilterGroup } from "../types";
 import { PropertyModal } from "../ui/propertyModal";
 import { ManageTemplatesModal } from "../ui/templateModal";
 
@@ -270,11 +270,17 @@ export async function createInlineRow(
 	template?: RowTemplate
 ): Promise<void> {
 	const seed: Record<string, unknown> = { ...extraSeed };
-	for (const rule of view.filter?.rules ?? []) {
-		if (rule.operator !== "is" || rule.value === undefined) continue;
-		const prop = findProperty(ctx.schema, rule.property);
-		if (!prop || seed[prop.id] !== undefined) continue;
-		seed[prop.id] = prop.type === "multiselect" ? [rule.value] : rule.value;
+	// Only the top-level `is` rules of an AND group describe every row the view
+	// shows. Inside an `or`, or under a nested group, a rule constrains some
+	// rows and not others, so seeding from it would be a guess.
+	if (!view.filter || view.filter.conjunction === "and") {
+		for (const node of view.filter?.rules ?? []) {
+			if (isFilterGroup(node)) continue;
+			if (node.operator !== "is" || node.value === undefined) continue;
+			const prop = findProperty(ctx.schema, node.property);
+			if (!prop || seed[prop.id] !== undefined) continue;
+			seed[prop.id] = prop.type === "multiselect" ? [node.value] : node.value;
+		}
 	}
 	const file = await ctx.store.createRow(ctx.schema, template?.name ?? "Untitled", seed, template);
 	// Stay put. Notion adds the row in the grid and lets you type its title
@@ -363,6 +369,8 @@ export function iconForType(type: string): string {
 			return "arrow-left-right";
 		case "rollup":
 			return "layers";
+		case "uniqueid":
+			return "hash";
 		case "formula":
 			return "sigma";
 		default:

@@ -9,15 +9,45 @@ export function parseYaml(source: string): unknown {
 	const lines = source.split("\n");
 	let currentKey: string | null = null;
 	let currentList: string[] | null = null;
+	// One level of nesting, which is what `filter: { any: [...] }` needs.
+	let nestedUnder: string | null = null;
+	let nestedKey: string | null = null;
+	let nestedList: string[] | null = null;
+
+	const flushNested = () => {
+		if (nestedUnder && nestedKey && nestedList) {
+			root[nestedUnder] = { [nestedKey]: nestedList };
+		}
+		nestedUnder = null;
+		nestedKey = null;
+		nestedList = null;
+	};
 
 	const flush = () => {
 		if (currentKey && currentList) root[currentKey] = currentList;
+		flushNested();
 		currentKey = null;
 		currentList = null;
 	};
 
 	for (const line of lines) {
 		if (!line.trim() || line.trim().startsWith("#")) continue;
+
+		// A deeper list item belongs to the nested key, not the outer one.
+		const deepItem = line.match(/^\s{4,}-\s+(.*)$/);
+		if (deepItem && nestedKey) {
+			nestedList = nestedList ?? [];
+			nestedList.push(stripQuotes(deepItem[1]));
+			continue;
+		}
+
+		const nestedPair = line.match(/^\s{2,}([A-Za-z0-9_-]+):\s*$/);
+		if (nestedPair && currentKey) {
+			nestedUnder = currentKey;
+			nestedKey = nestedPair[1];
+			nestedList = null;
+			continue;
+		}
 
 		const listItem = line.match(/^\s+-\s+(.*)$/);
 		if (listItem && currentKey) {

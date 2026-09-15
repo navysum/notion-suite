@@ -74,9 +74,17 @@ export function renderDatabaseView(
 	}
 }
 
-/** Resolve which properties this view shows, honouring the block's own order. */
+/**
+ * Resolve which properties this view shows.
+ *
+ * Two levels of hiding, and they mean different things: a property hidden on
+ * the schema is hidden everywhere, while `hiddenProperties` on a view hides it
+ * in that view alone. Notion only has the second, which is what people
+ * actually want -- the same database read two ways.
+ */
 function visibleProperties(ctx: ViewContext, view: ViewConfig): PropertyDef[] {
-	const all = ctx.schema.properties.filter((p) => !p.hidden);
+	const hiddenHere = new Set(view.hiddenProperties ?? []);
+	const all = ctx.schema.properties.filter((p) => !p.hidden && !hiddenHere.has(p.id));
 	const requested = view.visibleProperties ?? [];
 	if (requested.length === 0) return all;
 
@@ -86,7 +94,7 @@ function visibleProperties(ctx: ViewContext, view: ViewConfig): PropertyDef[] {
 		const match = ctx.schema.properties.find(
 			(p) => p.id.toLowerCase() === needle || p.name.toLowerCase() === needle
 		);
-		if (match && !resolved.includes(match)) resolved.push(match);
+		if (match && !resolved.includes(match) && !hiddenHere.has(match.id)) resolved.push(match);
 	}
 	return resolved.length > 0 ? resolved : all;
 }
@@ -156,13 +164,25 @@ function renderToolbar(
 	propsBtn.createSpan({ text: "Properties" });
 	propsBtn.addEventListener("click", (evt) => {
 		const menu = new Menu();
+		const hiddenHere = new Set(view.hiddenProperties ?? []);
 		for (const prop of ctx.schema.properties) {
+			const shown = !prop.hidden && !hiddenHere.has(prop.id);
 			menu.addItem((item) =>
 				item
 					.setTitle(prop.name)
 					.setIcon(iconForType(prop.type))
-					.setChecked(!prop.hidden)
+					.setChecked(shown)
 					.onClick(() => {
+						// Hide in this view when the block can be written back to;
+						// fall back to hiding everywhere when it cannot.
+						if (ctx.persistKey) {
+							const next = new Set(hiddenHere);
+							if (shown) next.add(prop.id);
+							else next.delete(prop.id);
+							view.hiddenProperties = [...next];
+							ctx.persistKey("hide", `[${[...next].join(", ")}]`);
+							return;
+						}
 						void ctx.store
 							.updateDatabase(ctx.schema.id, (schema) => {
 								const target = schema.properties.find((p) => p.id === prop.id);

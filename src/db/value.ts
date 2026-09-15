@@ -1,6 +1,7 @@
 import { PropertyDef, DatabaseRow } from "../types";
 import { formatDate, parseDate, toISODate } from "../utils/dates";
 import { runFormula } from "./formula";
+import { formatUniqueId } from "./store";
 import { asText } from "../utils/text";
 
 /**
@@ -10,6 +11,7 @@ import { asText } from "../utils/text";
  */
 export function coerce(prop: PropertyDef, raw: unknown): unknown {
 	switch (prop.type) {
+		case "uniqueid":
 		case "number": {
 			if (typeof raw === "number") return raw;
 			if (typeof raw === "string") {
@@ -81,6 +83,8 @@ export function formatValue(prop: PropertyDef, value: unknown): string {
 			return (value as string[]).join(", ");
 		case "rollup":
 			return formatRollup(prop, value);
+		case "uniqueid":
+			return formatUniqueId(prop, value);
 		default:
 			return String(value);
 	}
@@ -118,6 +122,7 @@ export function compareValues(prop: PropertyDef, a: unknown, b: unknown): number
 
 	switch (prop.type) {
 		case "number":
+		case "uniqueid":
 			return Number(a) - Number(b);
 		case "checkbox":
 			return (a ? 1 : 0) - (b ? 1 : 0);
