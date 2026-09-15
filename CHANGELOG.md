@@ -3,6 +3,39 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.6.5
+
+No change to how the plugin behaves. The parts of it that only ran inside
+Obsidian are now tested.
+
+Four of the six bugs found in the last audit were in code that only exists while
+Obsidian is running -- element lifecycles, panes, drag handlers. Nothing could
+reach them from a test, so the only check was a person clicking through the app,
+which is precisely the check that kept missing them.
+
+### Added
+
+- `tests/dom.ts`: a DOM, plus the element helpers Obsidian adds to it, so the
+  plugin's real renderers run in CI and can be driven the way a user drives
+  them.
+- `tests/view.test.ts` and `tests/interact.test.ts`: the search box keeps what
+  you typed and keeps narrowing; calendar and timeline navigation advance and
+  come back; collapsed rows and ticked rows survive a refresh; a side peek
+  reuses its own pane and never takes over the left sidebar; a card dragged
+  between columns writes the column it landed in and nothing else; dismissing
+  the delete dialog deletes nothing.
+
+  Every one of these was written by reintroducing the original bug and watching
+  the test fail.
+- The Obsidian stub's dialogs are now real enough to answer: a test can press a
+  named button or dismiss the dialog outright.
+
+### Changed
+
+- `docs/SMOKE.md` is down from twenty-one manual checks to eleven -- the ones
+  that turn on Obsidian's own semantics, a real drag gesture, or what the thing
+  actually looks like.
+
 ## 1.6.4
 
 Two silent filter bugs, and a set of checks so that this class of bug cannot

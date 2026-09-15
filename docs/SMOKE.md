@@ -1,72 +1,65 @@
 # Smoke checklist
 
-The unit tests cover the parts of the plugin that are pure: parsing, filtering,
-formulas, rollups, aggregation, ordering. They cannot cover the parts that only
-exist while Obsidian is running — panes, element lifecycles, drag handlers and
-the editor's DOM — and four of the six bugs found in the last audit were in
-exactly those paths.
+## What no longer needs a human
 
-This is the list for those. It is short on purpose: each item is one of the
-places a bug has actually been found, not an exhaustive tour. Walk it before a
-release that touches views, panes or drag-and-drop.
+Most of this file used to be a list of things only a person clicking through
+Obsidian could check. `tests/dom.ts` gives the test suite a real DOM and the
+element helpers Obsidian adds to it, so the plugin's actual renderers now run in
+CI and can be driven the way a user drives them — typing into the search box,
+pressing "next month", dropping a card, dismissing a dialog.
 
-Each step says what to do and **what would be wrong**, so a failure is
-recognisable without knowing the code.
+Covered by `tests/view.test.ts` and `tests/interact.test.ts`:
 
-## State that has to survive a refresh
+- The search box keeps what you typed, and keeps narrowing.
+- Calendar and timeline navigation advance, and "Today" comes back.
+- A collapsed row stays collapsed, and ticked rows stay ticked, across a refresh.
+- A side peek reuses its own pane and never takes over the left sidebar.
+- Ctrl-click opens a tab instead.
+- A card dragged between columns writes the column it landed in **and nothing
+  else**.
+- Dismissing the delete dialog deletes nothing; each answer deletes exactly what
+  it says, sub-items included.
+- Every filter shape survives a round trip through both readers
+  (`tests/roundtrip.test.ts`).
 
-1. Open a database view, type into the search box, keep typing.
-   *Wrong:* the box empties itself, or the results stop narrowing.
-2. Switch to calendar, press **next month** three times.
-   *Wrong:* the title snaps back to this month.
-3. Switch to timeline, press **next**, then **Today**.
-   *Wrong:* the window does not move, or does not come back.
-4. Collapse a row with sub-items, then edit a value in another row.
-   *Wrong:* the collapsed row springs open again.
-5. Tick three rows for a bulk edit, then change a value elsewhere in the view.
-   *Wrong:* the ticks clear.
-6. Do 1–5 again in a **full-page** database (open one from the sidebar).
-   This is a separate surface with its own host element, and it is where the
-   search box last broke.
+Each of those was verified by reintroducing the original bug and watching the
+test fail. They are not decorative.
 
-## Panes
+## What still needs you
 
-7. Click a row. It should open beside the view, not over it.
-8. Pin a note in the **left** sidebar, then click a row.
-   *Wrong:* the pinned note is replaced.
-9. Click several rows in a row.
-   *Wrong:* panes stack up instead of one being reused.
-10. Ctrl/Cmd-click a row — it should open in a new tab instead.
+These turn on things the harness cannot honestly model: Obsidian's real
+semantics, a real drag gesture, and what the thing actually looks like. The test
+suite's Obsidian is a model, and a wrong model passes its own tests.
 
-## Drag and drop
+Twenty minutes, before a release that touches views, panes or the editor.
 
-11. Drag a card between board columns. The other values on the card must be
-    unchanged — open it and check.
-12. Drag a card **within** one column to reorder it. It should land where it was
-    dropped, not one position off.
-13. Decline the "switch to manual ordering?" prompt, then drag again.
-    *Wrong:* it asks a second time.
-14. Drag a card into a column that is at its WIP limit.
-    *Wrong:* it fails silently, or the card disappears.
+### Real gestures
 
-## Editor DOM
+1. Drag a card between columns with the mouse. It should land where you dropped
+   it. (The handler is tested; the browser's drag gesture reaching it is not.)
+2. Drag a card **within** one column to reorder it.
+   *Wrong:* it lands one position off.
+3. Decline the "switch to manual ordering?" prompt, then drag again.
+   *Wrong:* it asks a second time.
+4. Drag a card into a column already at its WIP limit. It should go, with the
+   count coloured — a limit is a signal, not a rule.
 
-15. Open a note with an icon and a cover. Both should appear above the title.
-16. Switch that note to source mode and back.
-    *Wrong:* two banners, or none.
-17. Close and reopen the tab.
-    *Wrong:* the banner is gone, or duplicated.
+### The editor's DOM
 
-## Destructive actions
+5. Open a note with an icon and a cover. Both appear above the title.
+6. Switch to source mode and back.
+   *Wrong:* two banners, or none.
+7. Close and reopen the tab.
+   *Wrong:* the banner is gone, or duplicated.
 
-18. Delete a row that has sub-items. Press **Escape** at the dialog.
-    *Wrong:* anything at all is deleted.
-19. Do it again and choose "delete the sub-items too" — they should all go.
-20. Do it again and choose to keep them — they should remain, un-nested.
+### It has to look right
 
-## Filters
+8. Open a board, a gallery, a calendar and a timeline. Nothing overlapping,
+   clipped or unreadable.
+9. Switch between light and dark theme.
+10. Narrow the pane until it scrolls horizontally.
 
-21. Build a filter with an **or** in it. Save. Reopen the settings dialog and
-    press Save again without touching anything.
-    *Wrong:* the rows that match change. (This one is covered by
-    `tests/roundtrip.test.ts` now, but it is worth eyes on: it was silent.)
+### The install itself
+
+11. Update from the previous version and open an existing database. Its schema,
+    views and rows are intact.
