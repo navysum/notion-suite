@@ -565,6 +565,20 @@ Everything else in this README works today.
 
 ---
 
+## 10b. What this plugin touches
+
+Worth stating plainly, since the community directory lists it as a behaviour:
+
+- **Your vault files.** It creates and edits notes in your database folders, and
+  writes property values into their frontmatter. That is the entire point of it.
+- **Your clipboard — write only.** Two buttons put text there: "Copy link" on a
+  row, and "Copy view block" in settings. Nothing ever *reads* your clipboard.
+- **The network: never.** No telemetry, no accounts, no remote calls, no
+  external assets. Charts are drawn locally as SVG, with no charting library.
+  You can verify this yourself: the directory's review reports "no suspicious
+  network patterns", and reproduces the released `main.js` byte-for-byte from
+  this repository's source.
+
 ## 11. Settings
 
 - **Slash command menu** — turn the `/` menu on or off.
