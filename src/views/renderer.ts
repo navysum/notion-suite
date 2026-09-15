@@ -7,6 +7,7 @@ import { renderBoard } from "./board";
 import { renderGallery } from "./gallery";
 import { renderList } from "./list";
 import { renderCalendar } from "./calendar";
+import { renderTimeline } from "./timeline";
 import { formatValue } from "../db/value";
 import { PropertyModal } from "../ui/propertyModal";
 import { addEditButton } from "./blockEdit";
@@ -65,6 +66,9 @@ export function renderDatabaseView(
 			// current month against it so navigation survives a re-render.
 			renderCalendar(bodyEl, ctx, view, rows, properties, container);
 			break;
+		case "timeline":
+			renderTimeline(bodyEl, ctx, view, rows, properties, container);
+			break;
 		default:
 			renderTable(bodyEl, ctx, view, rows, properties);
 	}
@@ -122,7 +126,14 @@ function renderToolbar(
 	switcher.createSpan({ text: capitalize(activeType) });
 	switcher.addEventListener("click", (evt) => {
 		const menu = new Menu();
-		for (const type of ["table", "board", "gallery", "list", "calendar"] as ViewType[]) {
+		for (const type of [
+			"table",
+			"board",
+			"gallery",
+			"list",
+			"calendar",
+			"timeline",
+		] as ViewType[]) {
 			menu.addItem((item) =>
 				item
 					.setTitle(capitalize(type))
@@ -207,6 +218,8 @@ export function viewIcon(type: ViewType): string {
 			return "list";
 		case "calendar":
 			return "calendar";
+		case "timeline":
+			return "gantt-chart";
 		default:
 			return "table";
 	}

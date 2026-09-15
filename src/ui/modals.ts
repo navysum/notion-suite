@@ -201,7 +201,7 @@ export class NewDatabaseModal extends Modal {
 	}
 }
 
-const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar"];
+const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar", "timeline"];
 
 /** Build a ```notion-db block for an existing database. */
 export class InsertViewModal extends Modal {
@@ -214,6 +214,9 @@ export class InsertViewModal extends Modal {
 	private title = "";
 	private properties = "";
 	private coverProperty = "";
+	private timelineStart = "";
+	private timelineEnd = "";
+	private timelineScale = "";
 	private cardSize = "";
 	private limit = "";
 	private readonly isEdit: boolean;
@@ -242,6 +245,9 @@ export class InsertViewModal extends Modal {
 		this.title = config.name ?? "";
 		this.properties = (config.visibleProperties ?? []).join(", ");
 		this.coverProperty = config.coverProperty ?? "";
+		this.timelineStart = config.timelineStart ?? "";
+		this.timelineEnd = config.timelineEnd ?? "";
+		this.timelineScale = config.timelineScale ?? "";
 		this.cardSize = config.cardSize ?? "";
 		this.limit = config.pageSize ? String(config.pageSize) : "";
 	}
@@ -336,6 +342,37 @@ export class InsertViewModal extends Modal {
 			});
 		}
 
+		if (this.viewType === "timeline") {
+			const dates = schema.properties.filter((p) =>
+				["date", "created", "updated"].includes(p.type)
+			);
+			this.timelineStart = this.timelineStart || dates[0]?.id || "";
+			new Setting(parent)
+				.setName("Start date")
+				.setDesc("Where each bar begins.")
+				.addDropdown((dropdown) => {
+					if (dates.length === 0) dropdown.addOption("", "No date property available");
+					for (const prop of dates) dropdown.addOption(prop.id, prop.name);
+					dropdown.setValue(this.timelineStart).onChange((value) => (this.timelineStart = value));
+				});
+
+			new Setting(parent)
+				.setName("End date")
+				.setDesc("Leave as None to mark single days instead of bars.")
+				.addDropdown((dropdown) => {
+					dropdown.addOption("", "None");
+					for (const prop of dates) dropdown.addOption(prop.id, prop.name);
+					dropdown.setValue(this.timelineEnd).onChange((value) => (this.timelineEnd = value));
+				});
+
+			new Setting(parent).setName("Scale").addDropdown((dropdown) => {
+				dropdown.addOption("day", "Days");
+				dropdown.addOption("week", "Weeks");
+				dropdown.addOption("month", "Months");
+				dropdown.setValue(this.timelineScale || "day").onChange((value) => (this.timelineScale = value));
+			});
+		}
+
 		if (this.viewType === "gallery" || this.viewType === "board") {
 			const images = schema.properties.filter((p) => ["files", "url", "text"].includes(p.type));
 			new Setting(parent)
@@ -408,6 +445,13 @@ export class InsertViewModal extends Modal {
 		const lines = [`database: ${schema.name}`, `view: ${this.viewType}`];
 		if (this.viewType === "board" && this.groupBy) lines.push(`group: ${this.groupBy}`);
 		if (this.viewType === "calendar" && this.dateProperty) lines.push(`date: ${this.dateProperty}`);
+		if (this.viewType === "timeline") {
+			if (this.timelineStart) lines.push(`start: ${this.timelineStart}`);
+			if (this.timelineEnd) lines.push(`end: ${this.timelineEnd}`);
+			if (this.timelineScale && this.timelineScale !== "day") {
+				lines.push(`scale: ${this.timelineScale}`);
+			}
+		}
 		if (this.coverProperty) lines.push(`cover: ${this.coverProperty}`);
 		if (this.cardSize) lines.push(`size: ${this.cardSize}`);
 
