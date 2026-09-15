@@ -7,6 +7,7 @@ import { seedFrontmatter } from "../src/db/store";
 import { calculateColumn, calculationsFor, formatCalculation } from "../src/db/calculate";
 import { groupRows } from "../src/db/query";
 import { buildTree, descendantsOf } from "../src/db/tree";
+import { positionFor, sortByOrder } from "../src/db/order";
 import { formatValue, compareValues } from "../src/db/value";
 import { DatabaseRow, DatabaseSchema, PropertyDef, ROLLUP_TITLE_KEY } from "../src/types";
 
@@ -570,6 +571,51 @@ test("descendantsOf finds every row beneath one", () => {
 	];
 	assert.deepEqual(descendantsOf(nested, list, "Top.md").map((r) => r.name), ["Mid", "Leaf"]);
 	assert.deepEqual(descendantsOf(nested, list, "Other.md"), []);
+});
+
+// --- manual order ----------------------------------------------------------
+
+const ordered: DatabaseSchema = { ...tasks, orderProperty: "pos" };
+
+test("sortByOrder puts unpositioned rows last and breaks ties by name", () => {
+	const list = [row("C", { pos: 300 }), row("A", { pos: 100 }), row("New", {}), row("B", { pos: 100 })];
+	assert.deepEqual(sortByOrder(ordered, list).map((r) => r.name), ["A", "B", "C", "New"]);
+});
+
+test("positionFor takes the midpoint when there is room", () => {
+	const siblings = [row("A", { pos: 100 }), row("B", { pos: 300 })];
+	const moving = row("M", {});
+	assert.deepEqual(positionFor(ordered, siblings, 1, moving), { value: 200, renumber: [] });
+});
+
+test("positionFor appends past the end and prepends before the start", () => {
+	const siblings = [row("A", { pos: 100 }), row("B", { pos: 200 })];
+	const moving = row("M", {});
+	assert.equal(positionFor(ordered, siblings, 2, moving).value, 300);
+	assert.equal(positionFor(ordered, siblings, 0, moving).value, 50);
+});
+
+test("positionFor respaces the column when two neighbours are adjacent", () => {
+	// No midpoint exists between 100 and 101, so everything is laid out afresh.
+	const siblings = [row("A", { pos: 100 }), row("B", { pos: 101 })];
+	const moving = row("M", {});
+	const result = positionFor(ordered, siblings, 1, moving);
+	assert.equal(result.value, 200);
+	assert.deepEqual(result.renumber.map((r) => [r.row.name, r.value]), [["A", 100], ["B", 300]]);
+});
+
+test("positionFor handles an empty column and clamps a silly index", () => {
+	const moving = row("M", {});
+	assert.equal(positionFor(ordered, [], 0, moving).value, 100);
+	assert.equal(positionFor(ordered, [], 99, moving).value, 100);
+});
+
+test("moving a row within its own column ignores its old position", () => {
+	const a = row("A", { pos: 100 });
+	const b = row("B", { pos: 200 });
+	const c = row("C", { pos: 300 });
+	// Drag A to the end: it should land past C, not stay at 100.
+	assert.equal(positionFor(ordered, [a, b, c], 2, a).value, 400);
 });
 
 // --- presentation ----------------------------------------------------------

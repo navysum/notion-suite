@@ -183,10 +183,37 @@ export interface RowGroup {
  * Group rows for the board view. Multi-select rows legitimately belong to
  * several columns at once, so they are emitted into each of them.
  */
+/**
+ * Bucket a date into the horizons a board is actually useful at.
+ *
+ * Grouping a board by a raw date gives one column per day, which is useless.
+ * These buckets are what people mean when they group a board by "when".
+ */
+export function dateBucket(value: unknown, today = new Date()): string {
+	const date = parseDate(value);
+	if (!date) return "";
+
+	const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+	const days = Math.round((startOfDay(date) - startOfDay(today)) / 86400000);
+
+	if (days < 0) return "Overdue";
+	if (days === 0) return "Today";
+	if (days === 1) return "Tomorrow";
+	// "This week" runs to the end of the current week, not seven days out.
+	const daysLeftThisWeek = 6 - today.getDay();
+	if (days <= daysLeftThisWeek) return "This week";
+	if (days <= daysLeftThisWeek + 7) return "Next week";
+	return "Later";
+}
+
+/** The order date buckets read in, regardless of which ones are present. */
+export const DATE_BUCKET_ORDER = ["Overdue", "Today", "Tomorrow", "This week", "Next week", "Later"];
+
 export function groupRows(
 	schema: DatabaseSchema,
 	rows: DatabaseRow[],
-	groupBy: string
+	groupBy: string,
+	options: { dateBuckets?: boolean } = {}
 ): RowGroup[] {
 	const prop = findProperty(schema, groupBy);
 	const buckets = new Map<string, DatabaseRow[]>();
@@ -206,8 +233,19 @@ export function groupRows(
 		for (const option of ordered) buckets.set(option.name, []);
 	}
 
+	const bucketDates =
+		options.dateBuckets && prop && ["date", "created", "updated"].includes(prop.type);
+	if (bucketDates) {
+		// Seed in horizon order so empty columns still sit in the right place.
+		for (const label of DATE_BUCKET_ORDER) buckets.set(label, []);
+	}
+
 	for (const row of rows) {
 		const value = prop ? row.values[prop.id] : undefined;
+		if (bucketDates) {
+			push(dateBucket(value), row);
+			continue;
+		}
 		if (Array.isArray(value)) {
 			if (value.length === 0) push("", row);
 			else for (const v of value) push(String(v), row);
@@ -222,6 +260,8 @@ export function groupRows(
 
 	const groups: RowGroup[] = [];
 	for (const [key, groupRowsList] of buckets) {
+		// A seeded date bucket nobody landed in is noise, so drop it.
+		if (bucketDates && groupRowsList.length === 0) continue;
 		groups.push({ key, label: key === "" ? "No value" : key, rows: groupRowsList });
 	}
 	// Empty-value column last, mirroring Notion's board layout.

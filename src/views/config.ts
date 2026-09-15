@@ -262,6 +262,17 @@ function nodeToText(node: FilterNode): string {
 
 const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar", "timeline"];
 
+/** Read `limits: {Doing: 3}` into a lookup. */
+function parseLimits(raw: unknown): Record<string, number> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+	const out: Record<string, number> = {};
+	for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+		const n = Number(value);
+		if (Number.isFinite(n) && n > 0) out[key] = n;
+	}
+	return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Read `calculate: {hours: sum, done: percent_checked}` into a lookup. */
 function parseCalculations(raw: unknown): Record<string, RollupFunction> | undefined {
 	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
@@ -315,6 +326,10 @@ export function parseViewBlock(source: string): ParsedViewBlock {
 		sorts: sorts.length > 0 ? sorts : undefined,
 		calculate: parseCalculations(raw.calculate),
 		hiddenProperties: toStringArray(raw.hide ?? raw.hidden),
+		subGroupBy: asText(raw.subgroup ?? raw.subGroupBy) || undefined,
+		collapsedGroups: toStringArray(raw.collapsed),
+		limits: parseLimits(raw.limits),
+		dateBuckets: raw.buckets === true || asKey(raw.group_by) === "date",
 		timelineStart: asText(raw.start ?? raw.timelineStart) || undefined,
 		timelineEnd: asText(raw.end ?? raw.timelineEnd) || undefined,
 		timelineScale: ["day", "week", "month"].includes(asKey(raw.scale))
