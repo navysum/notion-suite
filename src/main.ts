@@ -26,6 +26,7 @@ import {
 	NewRowModal,
 } from "./ui/modals";
 import { PropertyModal } from "./ui/propertyModal";
+import { addEditButton, replaceBlock, setBlockKey, updateBlockBody } from "./views/blockEdit";
 import { DatabaseSchema } from "./types";
 
 export default class NotionForObsidian extends Plugin {
@@ -103,6 +104,21 @@ export default class NotionForObsidian extends Plugin {
 				schema,
 				sourcePath: ctx.sourcePath,
 				refresh: () => child.rerender(),
+				requestEdit: () => {
+					new InsertViewModal(
+						this.app,
+						this.store,
+						(block) => void replaceBlock(this.app, ctx, el, block),
+						// Hand the modal the view as parsed, so every control opens
+						// showing what this block actually says.
+						{ ...config, databaseId: schema.name }
+					).open();
+				},
+				persistKey: (key, value) => {
+					void updateBlockBody(this.app, ctx, el, "notion-db", (body) =>
+						setBlockKey(body, key, value)
+					);
+				},
 			};
 			renderDatabaseView(el, viewCtx, config);
 		});
@@ -130,6 +146,18 @@ export default class NotionForObsidian extends Plugin {
 			el.empty();
 			const data = buildChartData(schema, this.store.rows(schema), config);
 			renderChart(el, config, data);
+
+			// The gear is the whole point: the block's YAML is never something
+			// the user has to open, remember or type.
+			const bar = el.createDiv({ cls: "nfo-chart-actions" });
+			addEditButton(bar, "Edit chart", () => {
+				new InsertChartModal(
+					this.app,
+					this.store,
+					(block) => void replaceBlock(this.app, ctx, el, block),
+					config
+				).open();
+			});
 		});
 		ctx.addChild(child);
 	}

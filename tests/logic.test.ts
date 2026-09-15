@@ -6,6 +6,8 @@ import { applyFilter, applySorts, groupRows, findProperty } from "../src/db/quer
 import { buildChartData } from "../src/charts/aggregate";
 import { parseChartBlock, parseFilterShorthand, parseSortShorthand, parseViewBlock } from "../src/views/config";
 import { scoreCommand, slashCommands } from "../src/slash/commands";
+import { filterToText, ruleToText } from "../src/views/config";
+import { spliceLines, setBlockKey, fence } from "../src/views/blockEdit";
 import { calendarGrid, parseDate, toISODate } from "../src/utils/dates";
 import { DatabaseRow, DatabaseSchema, PropertyDef } from "../src/types";
 
@@ -406,6 +408,71 @@ test("every slash command either inserts a snippet or runs an action", () => {
 test("slash command ids are unique", () => {
 	const ids = slashCommands().map((c) => c.id);
 	assert.equal(new Set(ids).size, ids.length);
+});
+
+// --- editing blocks in place -----------------------------------------------
+
+test("spliceLines replaces exactly the block's lines", () => {
+	const doc = ["# Note", "", "```notion-chart", "database: Tasks", "```", "", "After."].join("\n");
+	const next = spliceLines(doc, 2, 4, "```notion-chart\ndatabase: Projects\nchart: pie\n```");
+	assert.equal(
+		next,
+		["# Note", "", "```notion-chart", "database: Projects", "chart: pie", "```", "", "After."].join("\n")
+	);
+});
+
+test("spliceLines does not accumulate blank lines across repeated edits", () => {
+	const doc = ["```notion-db", "database: Tasks", "```", "", "Body."].join("\n");
+	let next = spliceLines(doc, 0, 2, "```notion-db\ndatabase: Tasks\nview: board\n```\n\n");
+	next = spliceLines(next, 0, 3, "```notion-db\ndatabase: Tasks\nview: list\n```\n");
+	assert.equal(next, ["```notion-db", "database: Tasks", "view: list", "```", "", "Body."].join("\n"));
+});
+
+test("setBlockKey updates a key in place and keeps every other line", () => {
+	const body = ["database: Tasks", "view: table", "filter:", "  - Status is not Done"].join("\n");
+	assert.equal(
+		setBlockKey(body, "view", "board"),
+		["database: Tasks", "view: board", "filter:", "  - Status is not Done"].join("\n")
+	);
+});
+
+test("setBlockKey inserts a missing key just under the database line", () => {
+	const body = ["database: Tasks", "filter:", "  - Status is not Done"].join("\n");
+	assert.equal(
+		setBlockKey(body, "view", "calendar"),
+		["database: Tasks", "view: calendar", "filter:", "  - Status is not Done"].join("\n")
+	);
+	// A nested list item must never be mistaken for the top-level key.
+	assert.equal(setBlockKey("filter:\n  - view is board", "view", "list").split("\n")[0], "view: list");
+});
+
+test("fence wraps a body without doubling its trailing newlines", () => {
+	assert.equal(fence("notion-db", "database: Tasks\n\n"), "```notion-db\ndatabase: Tasks\n```");
+});
+
+test("a filter survives a round trip through the settings dialog", () => {
+	// The editor shows saved filters as text; if that text did not re-parse to
+	// the same rules, opening the settings would quietly change the filter.
+	const original = [
+		"Status is not Done",
+		"Due is not empty",
+		"Priority >= 3",
+		"Tags does not contain Work",
+		"Name starts with br",
+		"Due before today",
+	].join("\n");
+
+	const parsed = parseViewBlock(`database: Tasks\nfilter:\n${original.split("\n").map((r) => `  - ${r}`).join("\n")}`);
+	const shown = filterToText(parsed.config?.filter);
+	const reparsed = parseViewBlock(`database: Tasks\nfilter:\n${shown.split("\n").map((r) => `  - ${r}`).join("\n")}`);
+
+	assert.deepEqual(reparsed.config?.filter?.rules, parsed.config?.filter?.rules);
+	assert.equal(parsed.config?.filter?.rules.length, 6);
+});
+
+test("ruleToText omits the value for operators that take none", () => {
+	assert.equal(ruleToText({ property: "Due", operator: "is_not_empty" }), "Due is not empty");
+	assert.equal(ruleToText({ property: "Priority", operator: "gte", value: 3 }), "Priority >= 3");
 });
 
 // --- dates -----------------------------------------------------------------

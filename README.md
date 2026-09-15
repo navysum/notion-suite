@@ -190,6 +190,17 @@ Want a different trigger character? Settings → Notion Suite → Trigger charac
 
 ## 5. Database views
 
+**You never have to write this by hand either.** `/database` → **Database view**
+opens a dialog for every setting. On any rendered view, the toolbar has a
+**⚙ Settings** button that reopens it, pre-filled.
+
+Switching view type is even quicker: click the view-type button in the toolbar
+(**Table**, **Board**, …) and pick another. That choice is saved into the note,
+so it sticks — it isn't just a preview.
+
+<details>
+<summary>The underlying syntax, if you ever want to read or hand-edit it</summary>
+
 A view is a fenced code block tagged `notion-db`. The only required line is `database:`.
 
 ````markdown
@@ -216,6 +227,8 @@ group: status
 | `size` | Gallery card size: `small`, `medium`, `large`. | `size: large` |
 | `title` | A heading for this view. | `title: This week` |
 
+</details>
+
 ### The five views
 
 **Table** — a spreadsheet. Click any cell to edit it. Click a column header to sort or
@@ -237,7 +250,9 @@ that day. Arrows move between months.
 
 ## 6. Filtering and sorting
 
-Filters are written the way you'd say them out loud.
+Filters are written the way you'd say them out loud — in the settings dialog's
+**Filter** box, one per line. This is the one place you do type something, and
+it's deliberately English rather than syntax.
 
 ````markdown
 ```notion-db
@@ -404,7 +419,20 @@ as `0`. Division by zero gives an empty cell rather than an error.
 
 ## 8. Charts
 
-This is the piece Notion charges for. Here it's a code block.
+This is the piece Notion charges for.
+
+**You never have to write any of this by hand.** Type `/chart`, and you get a
+dialog of dropdowns with a **live preview** — the chart redraws as you change
+each setting, so you pick by looking rather than by remembering.
+
+Once a chart is in your note, hover it and click **⚙ Edit chart** to change it.
+Same dialog, pre-filled with what that chart currently does.
+
+<details>
+<summary>The underlying syntax, if you ever want to read or hand-edit it</summary>
+
+Behind the scenes a chart is a code block. You can edit it directly if you
+prefer, but the dialog writes every one of these keys for you.
 
 ````markdown
 ```notion-chart
@@ -431,7 +459,9 @@ title: Where my tasks are
 | `height` | Chart height in pixels. Default 340. |
 | `legend` / `values` | `false` to hide the legend or the data labels. |
 
-**Some charts worth stealing:**
+</details>
+
+**Some charts worth stealing** — paste these, or build them in the dialog:
 
 Spending by category this year:
 

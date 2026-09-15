@@ -9,6 +9,10 @@ export interface ViewContext {
 	/** Re-render the current view in place. */
 	refresh: () => void;
 	sourcePath: string;
+	/** Open this view's settings. Absent when the block cannot be located. */
+	requestEdit?: () => void;
+	/** Persist a single setting back into the block's source. */
+	persistKey?: (key: string, value: string) => void;
 }
 
 /** Open a row's note, honouring modifier-click for a new pane. */

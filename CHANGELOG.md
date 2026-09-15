@@ -3,6 +3,31 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.2.0
+
+You should not have to memorise a configuration syntax to use a chart. This
+release makes every setting a control, the way Notion does.
+
+### Added
+
+- **Chart settings dialog with a live preview.** Every key a chart block
+  understands now has a control — type, grouping, measure, series, stacking,
+  filter, order, limit, title, height, legend, data labels — and the chart
+  redraws as you change them. You choose by looking, not by remembering.
+- **Edit any chart in place.** Hover a rendered chart and click **Edit chart**
+  to reopen that dialog, pre-filled with what the chart currently does.
+- **Settings button on every database view**, likewise pre-filled, now covering
+  cover image, card size, visible properties, limit and heading as well as the
+  filter and sort it already had.
+- **Switching view type sticks.** Picking Board or Calendar from the toolbar
+  writes that choice into the note instead of resetting on reload.
+
+### Fixed
+
+- Editing a view no longer discards settings the old dialog could not show.
+  Filters are round-tripped back into the editor as the same English you typed,
+  which is covered by a test.
+
 ## 1.1.1
 
 Fixes found by an adversarial review of the 1.1.0 rollup code. No behaviour

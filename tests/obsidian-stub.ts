@@ -73,6 +73,9 @@ export class Events {
 }
 
 export const normalizePath = (p: string): string => p;
+export class Notice {
+	constructor(public message: string) {}
+}
 export class TFile {}
 export class TFolder {}
 export class Menu {}
