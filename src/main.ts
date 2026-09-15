@@ -15,6 +15,7 @@ import { ViewContext } from "./views/context";
 import { renderColumns } from "./views/columns";
 import { buildChartData } from "./charts/aggregate";
 import { renderChart } from "./charts/svg";
+import { parseWidgetBlock, renderWidget } from "./widgets/widget";
 import { SlashSuggest } from "./slash/suggest";
 import { SlashCommand } from "./slash/commands";
 import {
@@ -47,6 +48,9 @@ export default class NotionForObsidian extends Plugin {
 		);
 		this.registerMarkdownCodeBlockProcessor("notion-chart", (source, el, ctx) =>
 			this.renderChartBlock(source, el, ctx)
+		);
+		this.registerMarkdownCodeBlockProcessor("notion-widget", (source, el, ctx) =>
+			this.renderWidgetBlock(source, el, ctx)
 		);
 		this.registerMarkdownCodeBlockProcessor("notion-columns", async (source, el, ctx) => {
 			const child = new MarkdownRenderChild(el);
@@ -159,6 +163,34 @@ export default class NotionForObsidian extends Plugin {
 					config
 				).open();
 			});
+		});
+		ctx.addChild(child);
+	}
+
+	private renderWidgetBlock(
+		source: string,
+		el: HTMLElement,
+		ctx: MarkdownPostProcessorContext
+	): void {
+		const { config, error } = parseWidgetBlock(source);
+		if (!config) {
+			this.renderBlockError(el, error ?? "Could not read this widget.");
+			return;
+		}
+
+		// Widgets read whichever databases their own config names, so the
+		// context carries no single schema; each widget resolves its own.
+		const child = new BlockRenderChild(el, this.store, () => {
+			el.empty();
+			const widgetCtx: ViewContext = {
+				app: this.app,
+				store: this.store,
+				schema: this.store.all()[0],
+				sourcePath: ctx.sourcePath,
+				sidePeek: this.settings.sidePeek,
+				refresh: () => child.rerender(),
+			};
+			renderWidget(el, widgetCtx, config);
 		});
 		ctx.addChild(child);
 	}

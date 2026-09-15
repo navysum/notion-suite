@@ -1,5 +1,6 @@
 import { PropertyDef, DatabaseRow } from "../types";
 import { formatDate, parseDate, toISODate } from "../utils/dates";
+import { runFormula } from "./formula";
 import { asText } from "../utils/text";
 
 /**
@@ -145,85 +146,15 @@ export function compareValues(prop: PropertyDef, a: unknown, b: unknown): number
 }
 
 /**
- * A deliberately small formula language: property references in `{Braces}`,
- * numbers, and the four arithmetic operators with parentheses. It covers the
- * common Notion formulas (totals, ratios, differences) without shipping an
- * expression interpreter that could evaluate arbitrary code.
+ * Evaluate a formula property for one row.
+ *
+ * The language itself lives in `db/formula.ts`; this stays as the entry point
+ * every caller already uses.
  */
 export function evaluateFormula(
 	expression: string,
 	row: DatabaseRow,
 	properties: PropertyDef[]
-): number | string | null {
-	const substituted = expression.replace(/\{([^}]+)\}/g, (_match, rawName: string) => {
-		const name = rawName.trim();
-		const prop = properties.find((p) => p.name === name || p.id === name);
-		if (!prop) return "0";
-		const value = row.values[prop.id];
-		if (prop.type === "checkbox") return value ? "1" : "0";
-		const n = Number(value);
-		return isNaN(n) ? "0" : String(n);
-	});
-
-	if (!/^[-+*/(). 0-9]+$/.test(substituted)) return null;
-	try {
-		const result = evaluateArithmetic(substituted);
-		return result === null || !isFinite(result) ? null : Math.round(result * 10000) / 10000;
-	} catch {
-		return null;
-	}
-}
-
-/** Recursive-descent arithmetic evaluator (no eval, no Function constructor). */
-function evaluateArithmetic(input: string): number | null {
-	let pos = 0;
-	const src = input.replace(/\s+/g, "");
-
-	function parseExpression(): number | null {
-		let left = parseTerm();
-		if (left === null) return null;
-		while (pos < src.length && (src[pos] === "+" || src[pos] === "-")) {
-			const op = src[pos++];
-			const right = parseTerm();
-			if (right === null) return null;
-			left = op === "+" ? left + right : left - right;
-		}
-		return left;
-	}
-
-	function parseTerm(): number | null {
-		let left = parseFactor();
-		if (left === null) return null;
-		while (pos < src.length && (src[pos] === "*" || src[pos] === "/")) {
-			const op = src[pos++];
-			const right = parseFactor();
-			if (right === null) return null;
-			if (op === "/" && right === 0) return null;
-			left = op === "*" ? left * right : left / right;
-		}
-		return left;
-	}
-
-	function parseFactor(): number | null {
-		if (src[pos] === "-") {
-			pos++;
-			const inner = parseFactor();
-			return inner === null ? null : -inner;
-		}
-		if (src[pos] === "(") {
-			pos++;
-			const inner = parseExpression();
-			if (src[pos] !== ")") return null;
-			pos++;
-			return inner;
-		}
-		const start = pos;
-		while (pos < src.length && /[0-9.]/.test(src[pos])) pos++;
-		if (start === pos) return null;
-		const n = Number(src.slice(start, pos));
-		return isNaN(n) ? null : n;
-	}
-
-	const value = parseExpression();
-	return pos === src.length ? value : null;
+): number | string | boolean | null {
+	return runFormula(expression, row, properties);
 }

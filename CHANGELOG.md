@@ -3,6 +3,41 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.5.0
+
+The biggest release so far: real formulas, a timeline view, column footers, a
+status property, row templates, side peek and dashboard widgets.
+
+### Added
+
+- **A real formula language.** Previously arithmetic only, which could not
+  express "days until due" or "overdue?" — most of what anyone writes a formula
+  for. Now: `if`, comparisons, `and`/`or`/`not`, string functions, `prop()`,
+  `dateBetween`, `dateAdd`, `dateSubtract`, `formatDate`, `now`, `today`,
+  `empty`, `contains`, `length`, `min`/`max`/`round`/`abs`, and more. Still no
+  `eval` and no `Function` constructor: a formula is data a user typed, so it
+  must never become code. Input length, token count and nesting depth are all
+  capped, since this runs on the UI thread on every render.
+- **Timeline view.** Bars across a time axis at day, week or month scale. Rows
+  without an end date become single-day markers; rows with no date at all get an
+  "Unscheduled" section instead of vanishing.
+- **Calculate footers.** A row under each table where any column can show a sum,
+  average, min, percent checked and so on. It aggregates the rows the *view* is
+  showing, so it can never contradict the numbers above it.
+- **Status property.** Options belong to a to-do, in-progress or complete stage,
+  and boards order their columns by that stage rather than by the order options
+  happen to be listed in.
+- **Row templates.** Set a row up the way you like, right-click it, and save it
+  as a template. The "New" button then offers it — and only shows a chevron when
+  a database actually has templates.
+- **Side peek.** Clicking a row opens its note beside the view instead of over
+  it, reusing an existing side pane. Losing your board every time you glance at
+  a row was the main reason a row-per-file database felt heavy.
+- **Dashboard widgets** via a ```notion-widget block: `metric` (one big number),
+  `progress` (a bar with n of m), `countdown` (days to a date), `list` (recent or
+  soonest rows) and `button` (one click creates a pre-filled row). Several can
+  sit side by side as a card row.
+
 ## 1.4.0
 
 Adding and naming rows no longer takes you out of the view you are working in.

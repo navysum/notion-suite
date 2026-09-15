@@ -78,5 +78,54 @@ export class Notice {
 }
 export class TFile {}
 export class TFolder {}
-export class Menu {}
+export class Menu {
+	addItem(): this {
+		return this;
+	}
+	addSeparator(): this {
+		return this;
+	}
+	showAtMouseEvent(): this {
+		return this;
+	}
+}
+
+// Enough of the UI classes for modules that merely import them to bundle.
+// The tests exercise pure logic, never the UI itself.
+export class Modal {
+	contentEl: unknown = null;
+	open(): void {}
+	close(): void {}
+}
+
+export class Setting {
+	constructor(_containerEl?: unknown) {}
+	setName(): this {
+		return this;
+	}
+	setDesc(): this {
+		return this;
+	}
+	setHeading(): this {
+		return this;
+	}
+	addText(): this {
+		return this;
+	}
+	addTextArea(): this {
+		return this;
+	}
+	addToggle(): this {
+		return this;
+	}
+	addDropdown(): this {
+		return this;
+	}
+	addButton(): this {
+		return this;
+	}
+	addExtraButton(): this {
+		return this;
+	}
+}
 export const setIcon = (): void => undefined;
