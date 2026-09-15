@@ -1,4 +1,4 @@
-import { Menu, setIcon } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { renderCell } from "./cells";
 import { ViewContext, openRow, rowContextMenu } from "./context";
@@ -10,6 +10,9 @@ import {
 	formatCalculation,
 } from "../db/calculate";
 import { RollupFunction, RowTemplate, isFilterGroup } from "../types";
+import { buildTree, TreeRow } from "../db/tree";
+import { DERIVED_TYPES } from "../db/store";
+import { BulkValueModal } from "../ui/bulkModal";
 import { PropertyModal } from "../ui/propertyModal";
 import { ManageTemplatesModal } from "../ui/templateModal";
 
@@ -45,10 +48,18 @@ export function renderTable(
 	const focusPath = ctx.takeTitleFocus ? ctx.takeTitleFocus() : null;
 
 	const body = table.createEl("tbody");
-	for (const row of rows) {
+	const tree = buildTree(ctx.schema, rows, ctx.collapsed ?? new Set());
+	for (const entry of tree) {
+		const row = entry.row;
 		const tr = body.createEl("tr", { cls: "nfo-tr" });
+		if (ctx.selected?.has(row.path)) tr.addClass("nfo-tr-selected");
 
 		const nameCell = tr.createEl("td", { cls: "nfo-td nfo-td-name" });
+		renderSelectBox(nameCell, ctx, row);
+		if (entry.depth > 0) {
+			nameCell.createSpan({ cls: "nfo-row-indent" }).style.width = `${entry.depth * 18}px`;
+		}
+		renderDisclosure(nameCell, ctx, entry);
 		renderTitleCell(nameCell, ctx, row, focusPath === row.path);
 
 		for (const prop of properties) {
@@ -62,7 +73,7 @@ export function renderTable(
 		more.addEventListener("click", (evt) => rowContextMenu(ctx, row.path, evt));
 	}
 
-	if (rows.length === 0) {
+	if (tree.length === 0) {
 		const tr = body.createEl("tr");
 		const td = tr.createEl("td", { cls: "nfo-empty-row" });
 		td.colSpan = properties.length + 2;
@@ -81,6 +92,8 @@ export function renderTable(
 	renderTemplatePicker(footerCell, ctx, view);
 
 	renderCalculationRow(foot, ctx, view, rows, properties);
+
+	renderBulkBar(container, ctx, rows);
 
 	const count = container.createDiv({ cls: "nfo-count" });
 	count.setText(`${rows.length} ${rows.length === 1 ? "row" : "rows"}`);
@@ -201,6 +214,135 @@ function setCalculation(
 		.join(", ");
 	if (ctx.persistKey) ctx.persistKey("calculate", `{${encoded}}`);
 	else ctx.refresh();
+}
+
+/** The tick box that puts a row into a bulk edit. */
+function renderSelectBox(cell: HTMLElement, ctx: ViewContext, row: DatabaseRow): void {
+	const selected = ctx.selected;
+	if (!selected) return;
+	const box = cell.createEl("input", { type: "checkbox", cls: "nfo-row-select" });
+	box.checked = selected.has(row.path);
+	box.addEventListener("click", (evt) => evt.stopPropagation());
+	box.addEventListener("change", () => {
+		if (box.checked) selected.add(row.path);
+		else selected.delete(row.path);
+		ctx.refresh();
+	});
+}
+
+/** The twisty that folds a row's sub-items away. */
+function renderDisclosure(cell: HTMLElement, ctx: ViewContext, entry: TreeRow): void {
+	const collapsed = ctx.collapsed;
+	// Keep the space even on childless rows so titles line up down the column.
+	const slot = cell.createSpan({ cls: "nfo-row-twisty" });
+	if (!collapsed || !entry.hasChildren) return;
+
+	const isCollapsed = collapsed.has(entry.row.path);
+	slot.addClass("nfo-row-twisty-active");
+	setIcon(slot, isCollapsed ? "chevron-right" : "chevron-down");
+	slot.setAttribute("aria-label", isCollapsed ? "Expand sub-items" : "Collapse sub-items");
+	slot.addEventListener("click", (evt) => {
+		evt.stopPropagation();
+		if (isCollapsed) collapsed.delete(entry.row.path);
+		else collapsed.add(entry.row.path);
+		ctx.refresh();
+	});
+}
+
+/**
+ * The bar that appears once rows are ticked.
+ *
+ * Every edit it performs is one property across every selected row, which is
+ * the whole point: the alternative is opening twenty notes.
+ */
+function renderBulkBar(container: HTMLElement, ctx: ViewContext, rows: DatabaseRow[]): void {
+	const selected = ctx.selected;
+	if (!selected || selected.size === 0) return;
+
+	// A selection can outlive the rows it referred to, if a filter changed.
+	const live = rows.filter((row) => selected.has(row.path));
+	if (live.length === 0) {
+		selected.clear();
+		return;
+	}
+
+	const bar = container.createDiv({ cls: "nfo-bulk-bar" });
+	bar.createSpan({
+		cls: "nfo-bulk-count",
+		text: `${live.length} selected`,
+	});
+
+	const setBtn = bar.createDiv({ cls: "nfo-bulk-action" });
+	setIcon(setBtn.createSpan(), "pencil");
+	setBtn.createSpan({ text: "Set a property" });
+	setBtn.addEventListener("click", (evt) => {
+		const menu = new Menu();
+		const editable = ctx.schema.properties.filter(
+			(p) => !DERIVED_TYPES.includes(p.type) && p.type !== "uniqueid"
+		);
+		for (const prop of editable) {
+			menu.addItem((item) =>
+				item
+					.setTitle(prop.name)
+					.setIcon(iconForType(prop.type))
+					.onClick(() => promptBulkValue(ctx, live, prop))
+			);
+		}
+		menu.showAtMouseEvent(evt);
+	});
+
+	const deleteBtn = bar.createDiv({ cls: "nfo-bulk-action nfo-bulk-danger" });
+	setIcon(deleteBtn.createSpan(), "trash");
+	deleteBtn.createSpan({ text: "Delete" });
+	deleteBtn.addEventListener("click", () => {
+		void (async () => {
+			for (const row of live) await ctx.store.deleteRow(row.path);
+			selected.clear();
+			new Notice(`Deleted ${live.length} ${live.length === 1 ? "row" : "rows"}.`);
+			ctx.refresh();
+		})();
+	});
+
+	const clearBtn = bar.createDiv({ cls: "nfo-bulk-action" });
+	clearBtn.createSpan({ text: "Clear selection" });
+	clearBtn.addEventListener("click", () => {
+		selected.clear();
+		ctx.refresh();
+	});
+}
+
+/** Ask for one value, then write it to every selected row. */
+function promptBulkValue(ctx: ViewContext, rows: DatabaseRow[], prop: PropertyDef): void {
+	const apply = (value: unknown): void => {
+		void (async () => {
+			for (const row of rows) {
+				await ctx.store.setValue(ctx.schema, row.path, prop.id, value);
+			}
+			new Notice(`Set ${prop.name} on ${rows.length} ${rows.length === 1 ? "row" : "rows"}.`);
+			ctx.refresh();
+		})();
+	};
+
+	if (prop.type === "checkbox") {
+		const menu = new Menu();
+		menu.addItem((item) => item.setTitle("Checked").onClick(() => apply(true)));
+		menu.addItem((item) => item.setTitle("Unchecked").onClick(() => apply(false)));
+		menu.showAtPosition({ x: 0, y: 0 });
+		return;
+	}
+
+	if ((prop.type === "select" || prop.type === "status") && prop.options?.length) {
+		const menu = new Menu();
+		for (const option of prop.options) {
+			menu.addItem((item) => item.setTitle(option.name).onClick(() => apply(option.name)));
+		}
+		menu.addSeparator();
+		menu.addItem((item) => item.setTitle("Clear").onClick(() => apply(null)));
+		menu.showAtPosition({ x: 0, y: 0 });
+		return;
+	}
+
+	new BulkValueModal(ctx.app, prop, apply).open();
 }
 
 /**

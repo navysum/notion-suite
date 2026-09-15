@@ -18,6 +18,10 @@ interface BlockState {
 	viewType?: ViewType;
 	/** Row whose title should open for editing on the next render. */
 	focusRow?: string;
+	/** Sub-item rows the user has collapsed, by path. */
+	collapsed: Set<string>;
+	/** Rows ticked for a bulk edit, by path. */
+	selected: Set<string>;
 }
 
 const blockState = new WeakMap<HTMLElement, BlockState>();
@@ -30,7 +34,8 @@ export function renderDatabaseView(
 	container.empty();
 	container.addClass("nfo-view");
 
-	const state = blockState.get(container) ?? { search: "" };
+	const state =
+		blockState.get(container) ?? { search: "", collapsed: new Set<string>(), selected: new Set<string>() };
 	blockState.set(container, state);
 	const activeType = state.viewType ?? view.type;
 
@@ -38,6 +43,8 @@ export function renderDatabaseView(
 	ctx.requestTitleFocus = (path: string) => {
 		state.focusRow = path;
 	};
+	ctx.collapsed = state.collapsed;
+	ctx.selected = state.selected;
 	ctx.takeTitleFocus = () => {
 		const path = state.focusRow ?? null;
 		state.focusRow = undefined;
