@@ -116,6 +116,37 @@ function parseFilters(raw: unknown): FilterGroup | undefined {
 	return rules.length > 0 ? { conjunction: "and", rules } : undefined;
 }
 
+/** Inverse of `parseFilterShorthand`, for showing a saved filter in the editor. */
+const OPERATOR_TEXT: Record<FilterOperator, string> = {
+	is: "is",
+	is_not: "is not",
+	contains: "contains",
+	not_contains: "does not contain",
+	starts_with: "starts with",
+	ends_with: "ends with",
+	is_empty: "is empty",
+	is_not_empty: "is not empty",
+	gt: ">",
+	gte: ">=",
+	lt: "<",
+	lte: "<=",
+	before: "before",
+	after: "after",
+	on_or_before: "on or before",
+	on_or_after: "on or after",
+};
+
+export function ruleToText(rule: FilterRule): string {
+	const head = `${rule.property} ${OPERATOR_TEXT[rule.operator]}`;
+	return rule.value === undefined ? head : `${head} ${rule.value}`;
+}
+
+/** Render a whole filter group as one rule per line. */
+export function filterToText(group: FilterGroup | undefined): string {
+	if (!group) return "";
+	return group.rules.map(ruleToText).join("\n");
+}
+
 const VIEW_TYPES: ViewType[] = ["table", "board", "gallery", "list", "calendar"];
 
 export interface ParsedViewBlock {

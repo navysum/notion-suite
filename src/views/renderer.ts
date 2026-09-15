@@ -9,6 +9,7 @@ import { renderList } from "./list";
 import { renderCalendar } from "./calendar";
 import { formatValue } from "../db/value";
 import { PropertyModal } from "../ui/propertyModal";
+import { addEditButton } from "./blockEdit";
 
 /** Per-block UI state that should survive a re-render but not be persisted. */
 interface BlockState {
@@ -116,9 +117,11 @@ function renderToolbar(
 					.setIcon(viewIcon(type))
 					.setChecked(type === activeType)
 					.onClick(() => {
-						// Switching is a per-session preview; the block source is untouched.
+						// Switching sticks: write it back to the block, as Notion does.
+						// Without a writable block it degrades to a session preview.
 						state.viewType = type;
-						ctx.refresh();
+						if (ctx.persistKey) ctx.persistKey("view", type);
+						else ctx.refresh();
 					})
 			);
 		}
@@ -171,6 +174,10 @@ function renderToolbar(
 			next.setSelectionRange(next.value.length, next.value.length);
 		}
 	});
+
+	if (ctx.requestEdit) {
+		addEditButton(actions, "Settings", ctx.requestEdit);
+	}
 
 	const newBtn = actions.createDiv({ cls: "nfo-toolbar-btn nfo-toolbar-primary" });
 	setIcon(newBtn.createSpan(), "plus");

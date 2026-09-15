@@ -8,8 +8,22 @@ import {
 	TFile,
 } from "obsidian";
 import { DatabaseStore, slugify } from "../db/store";
-import { DatabaseSchema, ChartKind, Aggregation, ViewType } from "../types";
+import { DatabaseSchema, ChartKind, Aggregation, ViewType, ChartConfig, ViewConfig } from "../types";
+import { filterToText, parseFilterShorthand } from "../views/config";
+import { buildChartData } from "../charts/aggregate";
+import { renderChart } from "../charts/svg";
+import { fence } from "../views/blockEdit";
+import { FilterGroup, FilterRule } from "../types";
 import { DatabaseTemplate, databaseTemplates } from "./templates";
+
+/** Parse the editor's filter textarea into a filter group. */
+function parseFilterLines(text: string): FilterGroup | undefined {
+	const rules = text
+		.split("\n")
+		.map((line) => parseFilterShorthand(line))
+		.filter((rule): rule is FilterRule => rule !== null);
+	return rules.length > 0 ? { conjunction: "and", rules } : undefined;
+}
 
 /** Pick a database from the ones defined in the vault. */
 export class DatabasePickerModal extends FuzzySuggestModal<DatabaseSchema> {
@@ -197,19 +211,45 @@ export class InsertViewModal extends Modal {
 	private dateProperty = "";
 	private filter = "";
 	private sort = "";
+	private title = "";
+	private properties = "";
+	private coverProperty = "";
+	private cardSize = "";
+	private limit = "";
+	private readonly isEdit: boolean;
 
 	constructor(
 		app: App,
 		private store: DatabaseStore,
-		private onInsert: (block: string) => void
+		private onInsert: (block: string) => void,
+		initial?: ViewConfig
 	) {
 		super(app);
+		this.isEdit = initial !== undefined;
+		if (initial) this.adopt(initial);
+	}
+
+	/** Populate the controls from an existing view so nothing is lost on edit. */
+	private adopt(config: ViewConfig): void {
+		this.schema = this.store.get(config.databaseId) ?? null;
+		this.viewType = config.type;
+		this.groupBy = config.groupBy ?? "";
+		this.dateProperty = config.dateProperty ?? "";
+		this.filter = filterToText(config.filter);
+		this.sort = (config.sorts ?? [])
+			.map((rule) => `${rule.property} ${rule.direction}`)
+			.join("\n");
+		this.title = config.name ?? "";
+		this.properties = (config.visibleProperties ?? []).join(", ");
+		this.coverProperty = config.coverProperty ?? "";
+		this.cardSize = config.cardSize ?? "";
+		this.limit = config.pageSize ? String(config.pageSize) : "";
 	}
 
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.addClass("nfo-modal");
-		contentEl.createEl("h2", { text: "Insert database view" });
+		contentEl.createEl("h2", { text: this.isEdit ? "View settings" : "Insert database view" });
 
 		const databases = this.store.all();
 		if (databases.length === 0) {
@@ -218,7 +258,7 @@ export class InsertViewModal extends Modal {
 			});
 			return;
 		}
-		this.schema = databases[0];
+		this.schema = this.schema ?? databases[0];
 
 		const body = contentEl.createDiv();
 		const rebuild = () => {
@@ -245,7 +285,7 @@ export class InsertViewModal extends Modal {
 		footer.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()));
 		footer.addButton((b) =>
 			b
-				.setButtonText("Insert")
+				.setButtonText(this.isEdit ? "Save" : "Insert")
 				.setCta()
 				.onClick(() => {
 					this.onInsert(this.buildBlock());
@@ -296,25 +336,80 @@ export class InsertViewModal extends Modal {
 			});
 		}
 
+		if (this.viewType === "gallery" || this.viewType === "board") {
+			const images = schema.properties.filter((p) => ["files", "url", "text"].includes(p.type));
+			new Setting(parent)
+				.setName("Cover image")
+				.setDesc("Property holding an image path or URL.")
+				.addDropdown((dropdown) => {
+					dropdown.addOption("", "None");
+					for (const prop of images) dropdown.addOption(prop.id, prop.name);
+					dropdown.setValue(this.coverProperty).onChange((value) => (this.coverProperty = value));
+				});
+		}
+
+		if (this.viewType === "gallery") {
+			new Setting(parent).setName("Card size").addDropdown((dropdown) => {
+				dropdown.addOption("", "Medium");
+				dropdown.addOption("small", "Small");
+				dropdown.addOption("large", "Large");
+				dropdown.setValue(this.cardSize).onChange((value) => (this.cardSize = value));
+			});
+		}
+
 		new Setting(parent)
 			.setName("Filter")
-			.setDesc('Plain English, e.g. "Status is not Done" — one per line.')
+			.setDesc('Plain English, one per line — e.g. "Status is not Done".')
 			.addTextArea((area) =>
-				area.setPlaceholder("Status is not Done").onChange((value) => (this.filter = value))
+				area
+					.setValue(this.filter)
+					.setPlaceholder("Status is not Done")
+					.onChange((value) => (this.filter = value))
 			);
 
 		new Setting(parent)
 			.setName("Sort")
-			.setDesc('e.g. "Due asc" or "-Priority".')
-			.addText((text) => text.setPlaceholder("Due asc").onChange((value) => (this.sort = value)));
+			.setDesc('e.g. "Due asc" or "-Priority". One per line for tie-breaking.')
+			.addTextArea((area) =>
+				area.setValue(this.sort).setPlaceholder("Due asc").onChange((value) => (this.sort = value))
+			);
+
+		new Setting(parent)
+			.setName("Show properties")
+			.setDesc("Comma-separated, in order. Blank shows all of them.")
+			.addText((text) =>
+				text
+					.setValue(this.properties)
+					.setPlaceholder("all")
+					.onChange((value) => (this.properties = value))
+			);
+
+		new Setting(parent)
+			.setName("Show only the first")
+			.setDesc("Leave blank for every row.")
+			.addText((text) =>
+				text
+					.setValue(this.limit)
+					.setPlaceholder("all")
+					.onChange((value) => (this.limit = value.replace(/[^0-9]/g, "")))
+			);
+
+		new Setting(parent)
+			.setName("Heading")
+			.setDesc("Shown in the view's toolbar instead of the database name.")
+			.addText((text) =>
+				text.setValue(this.title).setPlaceholder("Optional").onChange((value) => (this.title = value))
+			);
 	}
 
 	private buildBlock(): string {
 		const schema = this.schema;
 		if (!schema) return "";
-		const lines = ["```notion-db", `database: ${schema.name}`, `view: ${this.viewType}`];
+		const lines = [`database: ${schema.name}`, `view: ${this.viewType}`];
 		if (this.viewType === "board" && this.groupBy) lines.push(`group: ${this.groupBy}`);
 		if (this.viewType === "calendar" && this.dateProperty) lines.push(`date: ${this.dateProperty}`);
+		if (this.coverProperty) lines.push(`cover: ${this.coverProperty}`);
+		if (this.cardSize) lines.push(`size: ${this.cardSize}`);
 
 		const filters = this.filter
 			.split("\n")
@@ -324,9 +419,26 @@ export class InsertViewModal extends Modal {
 			lines.push("filter:");
 			for (const rule of filters) lines.push(`  - ${rule}`);
 		}
-		if (this.sort.trim()) lines.push(`sort: ${this.sort.trim()}`);
-		lines.push("```", "");
-		return lines.join("\n");
+
+		const sorts = this.sort
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
+		if (sorts.length === 1) lines.push(`sort: ${sorts[0]}`);
+		else if (sorts.length > 1) {
+			lines.push("sort:");
+			for (const rule of sorts) lines.push(`  - ${rule}`);
+		}
+
+		const properties = this.properties
+			.split(",")
+			.map((name) => name.trim())
+			.filter(Boolean);
+		if (properties.length > 0) lines.push(`properties: [${properties.join(", ")}]`);
+		if (this.limit) lines.push(`limit: ${this.limit}`);
+		if (this.title.trim()) lines.push(`title: ${this.title.trim()}`);
+
+		return `${fence("notion-db", lines.join("\n"))}\n`;
 	}
 }
 
@@ -343,6 +455,13 @@ const AGGREGATIONS: Aggregation[] = [
 ];
 
 /** Build a ```notion-chart block for an existing database. */
+/**
+ * Build or change a chart entirely through controls.
+ *
+ * Every key the block understands has a control here, and the preview redraws
+ * on each change, so the YAML is an implementation detail the user never has to
+ * learn or even see.
+ */
 export class InsertChartModal extends Modal {
 	private schema: DatabaseSchema | null = null;
 	private kind: ChartKind = "column";
@@ -351,39 +470,75 @@ export class InsertChartModal extends Modal {
 	private valueProperty = "";
 	private series = "";
 	private title = "";
+	private filterText = "";
+	private sort: NonNullable<ChartConfig["sort"]> = "value_desc";
+	private limit = "";
+	private height = "";
+	private stacked = false;
+	private showLegend = true;
+	private showValues = true;
+
+	private previewEl: HTMLElement | null = null;
+	private readonly isEdit: boolean;
 
 	constructor(
 		app: App,
 		private store: DatabaseStore,
-		private onInsert: (block: string) => void
+		private onInsert: (block: string) => void,
+		initial?: ChartConfig
 	) {
 		super(app);
+		this.isEdit = initial !== undefined;
+		if (initial) this.adopt(initial);
+	}
+
+	/** Populate the controls from an existing chart so nothing is lost on edit. */
+	private adopt(config: ChartConfig): void {
+		this.schema = this.store.get(config.database) ?? null;
+		this.kind = config.kind;
+		this.groupBy = config.groupBy;
+		this.aggregation = config.aggregation;
+		this.valueProperty = config.value ?? "";
+		this.series = config.series ?? "";
+		this.title = config.title ?? "";
+		this.filterText = filterToText(config.filter);
+		this.sort = config.sort ?? "value_desc";
+		this.limit = config.limit ? String(config.limit) : "";
+		this.height = config.height ? String(config.height) : "";
+		this.stacked = config.stacked ?? false;
+		this.showLegend = config.showLegend !== false;
+		this.showValues = config.showValues !== false;
 	}
 
 	onOpen(): void {
 		const { contentEl } = this;
-		contentEl.addClass("nfo-modal");
-		contentEl.createEl("h2", { text: "Insert chart" });
+		contentEl.addClass("nfo-modal", "nfo-chart-modal");
+		contentEl.createEl("h2", { text: this.isEdit ? "Chart settings" : "Insert chart" });
 
 		const databases = this.store.all();
 		if (databases.length === 0) {
 			contentEl.createEl("p", { text: "No databases yet — create one first." });
 			return;
 		}
-		this.schema = databases[0];
+		this.schema = this.schema ?? databases[0];
+
+		this.previewEl = contentEl.createDiv({ cls: "nfo-chart-preview" });
 
 		const body = contentEl.createDiv();
 		const rebuild = () => {
 			body.empty();
 			this.renderOptions(body);
+			this.drawPreview();
 		};
 
 		new Setting(contentEl.createDiv()).setName("Database").addDropdown((dropdown) => {
 			for (const schema of databases) dropdown.addOption(schema.id, schema.name);
 			dropdown.setValue(this.schema!.id).onChange((value) => {
 				this.schema = this.store.get(value) ?? null;
+				// Property ids do not carry across databases.
 				this.groupBy = "";
 				this.valueProperty = "";
+				this.series = "";
 				rebuild();
 			});
 		});
@@ -395,7 +550,7 @@ export class InsertChartModal extends Modal {
 		footer.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()));
 		footer.addButton((b) =>
 			b
-				.setButtonText("Insert")
+				.setButtonText(this.isEdit ? "Save" : "Insert")
 				.setCta()
 				.onClick(() => {
 					this.onInsert(this.buildBlock());
@@ -404,15 +559,63 @@ export class InsertChartModal extends Modal {
 		);
 	}
 
+	/** Redraw the sample chart from whatever the controls currently say. */
+	private drawPreview(): void {
+		const host = this.previewEl;
+		if (!host) return;
+		host.empty();
+		const schema = this.schema;
+		if (!schema) return;
+
+		const config = this.currentConfig(schema);
+		try {
+			const data = buildChartData(schema, this.store.rows(schema), config);
+			renderChart(host, { ...config, height: 220 }, data);
+		} catch {
+			// A half-typed filter should read as "nothing to show", not an error.
+			host.createDiv({ cls: "nfo-chart-empty", text: "Nothing to preview yet." });
+		}
+	}
+
+	private currentConfig(schema: DatabaseSchema): ChartConfig {
+		return {
+			database: schema.name,
+			kind: this.kind,
+			groupBy: this.groupBy,
+			value: this.aggregation === "count" ? undefined : this.valueProperty || undefined,
+			aggregation: this.aggregation,
+			series: this.series || undefined,
+			filter: parseFilterLines(this.filterText),
+			sort: this.sort,
+			limit: this.limit ? Number(this.limit) : undefined,
+			title: this.title.trim() || undefined,
+			height: this.height ? Number(this.height) : undefined,
+			stacked: this.stacked,
+			showLegend: this.showLegend,
+			showValues: this.showValues,
+		};
+	}
+
 	private renderOptions(parent: HTMLElement): void {
 		if (!this.schema) return;
 		const schema = this.schema;
+		// Any control that changes the picture redraws it; the ones that change
+		// which *other* controls apply rebuild the whole panel.
+		const redraw = () => this.drawPreview();
+		const rebuild = () => {
+			parent.empty();
+			this.renderOptions(parent);
+			this.drawPreview();
+		};
 
 		new Setting(parent).setName("Chart type").addDropdown((dropdown) => {
 			for (const kind of CHART_KINDS) {
 				dropdown.addOption(kind, kind.charAt(0).toUpperCase() + kind.slice(1));
 			}
-			dropdown.setValue(this.kind).onChange((value) => (this.kind = value as ChartKind));
+			dropdown.setValue(this.kind).onChange((value) => {
+				this.kind = value as ChartKind;
+				rebuild();
+			});
 		});
 
 		this.groupBy = this.groupBy || schema.properties[0]?.id || "";
@@ -421,7 +624,10 @@ export class InsertChartModal extends Modal {
 			.setDesc("Each value of this property becomes a bar or slice.")
 			.addDropdown((dropdown) => {
 				for (const prop of schema.properties) dropdown.addOption(prop.id, prop.name);
-				dropdown.setValue(this.groupBy).onChange((value) => (this.groupBy = value));
+				dropdown.setValue(this.groupBy).onChange((value) => {
+					this.groupBy = value;
+					redraw();
+				});
 			});
 
 		new Setting(parent)
@@ -431,21 +637,24 @@ export class InsertChartModal extends Modal {
 				for (const agg of AGGREGATIONS) dropdown.addOption(agg, agg.replace(/_/g, " "));
 				dropdown.setValue(this.aggregation).onChange((value) => {
 					this.aggregation = value as Aggregation;
-					parent.empty();
-					this.renderOptions(parent);
+					rebuild();
 				});
 			});
 
-		// `count` needs no operand; every other measure does.
+		// `count` needs no operand; every other measure does. A rollup is a
+		// legitimate operand here, since its result is a number.
 		if (this.aggregation !== "count") {
 			const numeric = schema.properties.filter((p) =>
-				["number", "formula", "checkbox"].includes(p.type)
+				["number", "formula", "rollup", "checkbox"].includes(p.type)
 			);
 			this.valueProperty = this.valueProperty || numeric[0]?.id || "";
 			new Setting(parent).setName("Value property").addDropdown((dropdown) => {
 				if (numeric.length === 0) dropdown.addOption("", "No numeric property available");
 				for (const prop of numeric) dropdown.addOption(prop.id, prop.name);
-				dropdown.setValue(this.valueProperty).onChange((value) => (this.valueProperty = value));
+				dropdown.setValue(this.valueProperty).onChange((value) => {
+					this.valueProperty = value;
+					redraw();
+				});
 			});
 		}
 
@@ -455,29 +664,132 @@ export class InsertChartModal extends Modal {
 			.addDropdown((dropdown) => {
 				dropdown.addOption("", "None");
 				for (const prop of schema.properties) dropdown.addOption(prop.id, prop.name);
-				dropdown.setValue(this.series).onChange((value) => (this.series = value));
+				dropdown.setValue(this.series).onChange((value) => {
+					this.series = value;
+					rebuild();
+				});
 			});
+
+		// Stacking only means anything with more than one series on a bar chart.
+		if (this.series && ["column", "bar"].includes(this.kind)) {
+			new Setting(parent)
+				.setName("Stack the series")
+				.setDesc("Off places them side by side.")
+				.addToggle((toggle) =>
+					toggle.setValue(this.stacked).onChange((value) => {
+						this.stacked = value;
+						redraw();
+					})
+				);
+		}
+
+		new Setting(parent)
+			.setName("Filter")
+			.setDesc('Plain English, one per line — e.g. "Status is not Done".')
+			.addTextArea((area) =>
+				area
+					.setValue(this.filterText)
+					.setPlaceholder("Status is not Done")
+					.onChange((value) => {
+						this.filterText = value;
+						redraw();
+					})
+			);
+
+		new Setting(parent).setName("Order").addDropdown((dropdown) => {
+			dropdown.addOption("value_desc", "Largest first");
+			dropdown.addOption("value", "Smallest first");
+			dropdown.addOption("label", "By name");
+			dropdown.addOption("none", "Leave as-is");
+			dropdown.setValue(this.sort ?? "value_desc").onChange((value) => {
+				this.sort = value as NonNullable<ChartConfig["sort"]>;
+				redraw();
+			});
+		});
+
+		new Setting(parent)
+			.setName("Show only the top")
+			.setDesc("Leave blank for every group.")
+			.addText((text) =>
+				text
+					.setValue(this.limit)
+					.setPlaceholder("all")
+					.onChange((value) => {
+						this.limit = value.replace(/[^0-9]/g, "");
+						redraw();
+					})
+			);
 
 		new Setting(parent)
 			.setName("Title")
-			.addText((text) => text.setPlaceholder("Optional").onChange((value) => (this.title = value)));
+			.addText((text) =>
+				text
+					.setValue(this.title)
+					.setPlaceholder("Optional")
+					.onChange((value) => {
+						this.title = value;
+						redraw();
+					})
+			);
+
+		new Setting(parent)
+			.setName("Height")
+			.setDesc("Pixels. Blank uses the default.")
+			.addText((text) =>
+				text
+					.setValue(this.height)
+					.setPlaceholder("340")
+					.onChange((value) => (this.height = value.replace(/[^0-9]/g, "")))
+			);
+
+		new Setting(parent).setName("Show legend").addToggle((toggle) =>
+			toggle.setValue(this.showLegend).onChange((value) => {
+				this.showLegend = value;
+				redraw();
+			})
+		);
+
+		new Setting(parent).setName("Show data labels").addToggle((toggle) =>
+			toggle.setValue(this.showValues).onChange((value) => {
+				this.showValues = value;
+				redraw();
+			})
+		);
 	}
 
+	/** Emit only what differs from the defaults, so the block stays readable. */
 	private buildBlock(): string {
 		const schema = this.schema;
 		if (!schema) return "";
 		const lines = [
-			"```notion-chart",
 			`database: ${schema.name}`,
 			`chart: ${this.kind}`,
 			`group: ${this.groupBy}`,
 			`aggregate: ${this.aggregation}`,
 		];
-		if (this.aggregation !== "count" && this.valueProperty) lines.push(`value: ${this.valueProperty}`);
+		if (this.aggregation !== "count" && this.valueProperty) {
+			lines.push(`value: ${this.valueProperty}`);
+		}
 		if (this.series) lines.push(`series: ${this.series}`);
+		if (this.stacked && this.series) lines.push("stacked: true");
+
+		const filters = this.filterText
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
+		if (filters.length > 0) {
+			lines.push("filter:");
+			for (const rule of filters) lines.push(`  - ${rule}`);
+		}
+
+		if (this.sort && this.sort !== "value_desc") lines.push(`sort: ${this.sort}`);
+		if (this.limit) lines.push(`limit: ${this.limit}`);
 		if (this.title.trim()) lines.push(`title: ${this.title.trim()}`);
-		lines.push("```", "");
-		return lines.join("\n");
+		if (this.height) lines.push(`height: ${this.height}`);
+		if (!this.showLegend) lines.push("legend: false");
+		if (!this.showValues) lines.push("values: false");
+
+		return `${fence("notion-chart", lines.join("\n"))}\n`;
 	}
 }
 

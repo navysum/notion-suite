@@ -811,3 +811,54 @@ body.nfo-typography hr {
 	border-top: 1px solid var(--nfo-border-strong);
 	margin: 1.6em 0;
 }
+
+/* --- Block settings (the gear on a rendered chart or view) ---------------- */
+
+.nfo-block-edit {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	border-radius: var(--nfo-radius);
+	cursor: pointer;
+	color: var(--nfo-muted);
+	font-size: 0.9em;
+	user-select: none;
+}
+
+.nfo-block-edit:hover { background: var(--nfo-hover); color: var(--text-normal); }
+.nfo-block-edit svg { width: 15px; height: 15px; }
+
+/* The chart's gear stays out of the way until the chart is hovered. */
+.nfo-chart-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 2px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.nfo-chart:hover + .nfo-chart-actions,
+.nfo-chart-actions:hover,
+.nfo-chart-actions:focus-within { opacity: 1; }
+
+/* --- Chart settings dialog ------------------------------------------------ */
+
+.nfo-chart-modal { max-width: 680px; }
+
+.nfo-chart-preview {
+	margin: 4px 0 14px;
+	padding: 10px 12px;
+	border: 1px solid var(--nfo-border-strong);
+	border-radius: var(--nfo-radius-lg);
+	background: var(--nfo-surface-alt);
+	max-height: 300px;
+	overflow: hidden;
+}
+
+.nfo-chart-preview .nfo-chart { margin: 0; }
+.nfo-chart-preview .nfo-chart-title { font-size: 0.95em; }
+
+/* The dialog holds a lot of controls; keep them scrollable under the preview. */
+.nfo-chart-modal .setting-item { padding-top: 10px; padding-bottom: 10px; }
+.nfo-chart-modal textarea { min-height: 62px; width: 100%; }
