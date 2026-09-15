@@ -72,6 +72,8 @@ export class PropertyModal extends Modal {
 	 *  relation?" once the user has touched it. */
 	private readonly originalType: PropertyDef["type"] | null;
 	private optionsText = "";
+	/** Whether this relation should become the schema's parent link. */
+	private asParentLink: boolean | null = null;
 
 	constructor(
 		app: App,
@@ -171,6 +173,18 @@ export class PropertyModal extends Modal {
 				);
 		}
 
+		if (type === "uniqueid") {
+			new Setting(parent)
+				.setName("Prefix")
+				.setDesc("Put in front of the number, e.g. TASK gives TASK-1. Cosmetic: changing it renumbers nothing.")
+				.addText((text) =>
+					text
+						.setValue(this.draft.idPrefix ?? "")
+						.setPlaceholder("TASK")
+						.onChange((value) => (this.draft.idPrefix = value.trim() || undefined))
+				);
+		}
+
 		if (type === "number") {
 			new Setting(parent).setName("Format").addDropdown((dropdown) => {
 				dropdown.addOption("plain", "Plain");
@@ -215,6 +229,20 @@ export class PropertyModal extends Modal {
 
 		if (type === "rollup") {
 			this.renderRollupOptions(parent);
+		}
+
+		if (type === "relation") {
+			new Setting(parent)
+				.setName("Use as the parent link")
+				.setDesc(
+					"Turns rows into a tree: a row pointing at another becomes its sub-item, " +
+						"indented beneath it with a fold arrow."
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.schema.parentProperty === this.draft.id)
+						.onChange((value) => (this.asParentLink = value))
+				);
 		}
 	}
 
@@ -348,10 +376,16 @@ export class PropertyModal extends Modal {
 		}
 
 		const draft = this.draft;
+		const asParent = this.asParentLink;
 		await this.store.updateDatabase(this.schema.id, (schema) => {
 			const index = schema.properties.findIndex((p) => p.id === draft.id);
 			if (index === -1) schema.properties.push(draft);
 			else schema.properties[index] = draft;
+
+			if (asParent === true) schema.parentProperty = draft.id;
+			else if (asParent === false && schema.parentProperty === draft.id) {
+				delete schema.parentProperty;
+			}
 		});
 
 		this.close();
@@ -374,6 +408,8 @@ export class PropertyModal extends Modal {
 		const draft = this.draft;
 		await this.store.updateDatabase(this.schema.id, (schema) => {
 			schema.properties = schema.properties.filter((p) => p.id !== draft.id);
+			// A deleted relation cannot go on being the parent link.
+			if (schema.parentProperty === draft.id) delete schema.parentProperty;
 			// Drop rollups that followed a relation which no longer exists,
 			// rather than leaving them silently blank forever.
 			if (this.originalType === "relation") {

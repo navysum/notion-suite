@@ -20,6 +20,10 @@ export interface ViewContext {
 	takeTitleFocus?: () => string | null;
 	/** Whether clicking a row opens it beside the view. Defaults to true. */
 	sidePeek?: boolean;
+	/** Sub-item rows the user has collapsed, by path. Mutated in place. */
+	collapsed?: Set<string>;
+	/** Rows ticked for a bulk edit, by path. Mutated in place. */
+	selected?: Set<string>;
 }
 
 /**

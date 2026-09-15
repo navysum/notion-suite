@@ -6,6 +6,7 @@ import { RowResolver, ResolverSource } from "../src/db/resolve";
 import { seedFrontmatter } from "../src/db/store";
 import { calculateColumn, calculationsFor, formatCalculation } from "../src/db/calculate";
 import { groupRows } from "../src/db/query";
+import { buildTree, descendantsOf } from "../src/db/tree";
 import { formatValue, compareValues } from "../src/db/value";
 import { DatabaseRow, DatabaseSchema, PropertyDef, ROLLUP_TITLE_KEY } from "../src/types";
 
@@ -481,6 +482,94 @@ test("board columns follow status stage order, not option order", () => {
 	};
 	const groups = groupRows(statusSchema, [], "state");
 	assert.deepEqual(groups.map((g) => g.key), ["Backlog", "Building", "Shipped"]);
+});
+
+// --- sub-items -------------------------------------------------------------
+
+const nested: DatabaseSchema = {
+	...tasks,
+	parentProperty: "parent",
+	properties: [...tasks.properties, { id: "parent", name: "Parent", type: "relation" }],
+};
+
+test("buildTree nests children under their parents in order", () => {
+	const list = [
+		row("Ship v2", { parent: null }),
+		row("Write docs", { parent: ["Ship v2"] }),
+		row("Draft outline", { parent: ["Write docs"] }),
+		row("Unrelated", { parent: null }),
+	];
+	assert.deepEqual(
+		buildTree(nested, list).map((e) => `${"  ".repeat(e.depth)}${e.row.name}`),
+		["Ship v2", "  Write docs", "    Draft outline", "Unrelated"]
+	);
+});
+
+test("buildTree marks which rows have children", () => {
+	const list = [row("Parent", {}), row("Child", { parent: ["Parent"] })];
+	const tree = buildTree(nested, list);
+	assert.equal(tree[0].hasChildren, true);
+	assert.equal(tree[1].hasChildren, false);
+});
+
+test("buildTree accepts wikilinks and aliases as parent references", () => {
+	const list = [
+		row("Ship v2", {}),
+		row("A", { parent: "[[Ship v2]]" }),
+		row("B", { parent: "[[Ship v2|the release]]" }),
+		row("C", { parent: "SHIP V2" }),
+	];
+	assert.deepEqual(buildTree(nested, list).map((e) => e.depth), [0, 1, 1, 1]);
+});
+
+test("a row whose parent was filtered out is still shown, as a root", () => {
+	// Filtering by status must not make a child disappear entirely.
+	const list = [row("Orphan", { parent: ["Not in this view"] })];
+	const tree = buildTree(nested, list);
+	assert.equal(tree.length, 1);
+	assert.equal(tree[0].depth, 0);
+});
+
+test("buildTree terminates on a cycle and loses no rows", () => {
+	// Two rows naming each other is entirely possible by hand.
+	const list = [row("A", { parent: ["B"] }), row("B", { parent: ["A"] })];
+	const tree = buildTree(nested, list);
+	assert.equal(tree.length, 2, "both rows appear exactly once");
+	assert.deepEqual([...new Set(tree.map((e) => e.row.name))].sort(), ["A", "B"]);
+});
+
+test("a row that is its own parent is treated as a root", () => {
+	const list = [row("Self", { parent: ["Self"] })];
+	const tree = buildTree(nested, list);
+	assert.equal(tree.length, 1);
+	assert.equal(tree[0].depth, 0);
+});
+
+test("collapsing a row hides its descendants but keeps the row", () => {
+	const list = [
+		row("Parent", {}),
+		row("Child", { parent: ["Parent"] }),
+		row("Grandchild", { parent: ["Child"] }),
+	];
+	const collapsed = buildTree(nested, list, new Set(["Parent.md"]));
+	assert.deepEqual(collapsed.map((e) => e.row.name), ["Parent"]);
+	assert.equal(collapsed[0].hasChildren, true);
+});
+
+test("a database with no parent property is a flat list", () => {
+	const list = [row("A", {}), row("B", {})];
+	assert.deepEqual(buildTree(tasks, list).map((e) => e.depth), [0, 0]);
+});
+
+test("descendantsOf finds every row beneath one", () => {
+	const list = [
+		row("Top", {}),
+		row("Mid", { parent: ["Top"] }),
+		row("Leaf", { parent: ["Mid"] }),
+		row("Other", {}),
+	];
+	assert.deepEqual(descendantsOf(nested, list, "Top.md").map((r) => r.name), ["Mid", "Leaf"]);
+	assert.deepEqual(descendantsOf(nested, list, "Other.md"), []);
 });
 
 // --- presentation ----------------------------------------------------------
