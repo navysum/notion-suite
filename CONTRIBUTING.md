@@ -93,12 +93,29 @@ directory's review rejects plugins that do.
 
 *Enforced by:* `nothing evaluates a string as code`.
 
-## What the checks cannot see
+### 7. Behaviour that only runs in Obsidian is tested in a DOM, not by hand
 
-Roughly a third of this plugin only exists when Obsidian is running: pane
-handling, element lifecycles, drag handlers, the editor DOM. None of it is
-covered by `npm test`. `docs/SMOKE.md` is the checklist for those paths — walk
-it before cutting a release that touches views, panes or drag-and-drop.
+Four of the six bugs in the last audit were in code that only ran inside
+Obsidian — element lifecycles, panes, drag handlers — so the only check was a
+human clicking through the app, which is the check that kept missing them.
+
+`tests/dom.ts` installs a DOM (happy-dom) and the element helpers Obsidian bolts
+onto `HTMLElement`, so the plugin's real renderers run in CI. A test can type
+into the search box, press "next month", drop a card or dismiss a dialog and
+then look at what the user would be looking at. New behaviour in a view, a pane
+or a handler gets a test there.
+
+Every such test was written by reintroducing the original bug and watching it
+fail. Do that with a new one too — a test that has never failed has not been
+tested.
+
+## What the checks still cannot see
+
+The harness is a *model* of Obsidian, and a wrong model passes its own tests.
+What turns on Obsidian's real semantics — how `rightSplit` resolves, when a
+post-processor re-runs, what a real drag gesture carries — plus anything visual,
+stays in `docs/SMOKE.md`. That list is now eleven items rather than twenty-one.
+Walk it before a release that touches views, panes or the editor.
 
 ## Releasing
 
