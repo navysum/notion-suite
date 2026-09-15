@@ -3,6 +3,38 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.3.0
+
+Clears every item in the community directory's review. Needs Obsidian 1.13.0
+or later — see below.
+
+### Changed
+
+- **Settings now appear in Obsidian's settings search.** The settings tab is
+  declared through `getSettingDefinitions()` rather than drawn by hand, which is
+  what lets Obsidian index it. Each setting also carries search aliases, so
+  "kanban", "density" or "migrate" find the right one.
+- **The default-folder setting is now a folder picker** with autocomplete,
+  rather than a free-text box.
+- **The trigger character now rejects bad input** with an inline message instead
+  of silently rewriting what you typed.
+- **Your databases are a proper list** with a delete affordance and an add
+  button, and each row can jump straight to adding a property.
+
+### Removed
+
+- **Clipboard access.** "Copy view block" and "Copy link" were the only two
+  uses, and both are now redundant: views are inserted and edited through
+  dialogs, and Obsidian's own file menu copies links. The plugin no longer
+  touches your clipboard at all.
+
+### Requirements
+
+`minAppVersion` is now **1.13.0**. The declarative settings API and the
+non-deprecated destructive-button style both arrived in 1.13.0, and there is no
+way to adopt either on an older build. If you are below 1.13.0, stay on 1.2.1 —
+it is functionally identical apart from the settings tab.
+
 ## 1.2.1
 
 Pre-submission pass against `eslint-plugin-obsidianmd`, the linter the Obsidian

@@ -380,7 +380,7 @@ export class InsertViewModal extends Modal {
 			.addText((text) =>
 				text
 					.setValue(this.properties)
-					.setPlaceholder("all")
+					.setPlaceholder("All")
 					.onChange((value) => (this.properties = value))
 			);
 
@@ -390,7 +390,7 @@ export class InsertViewModal extends Modal {
 			.addText((text) =>
 				text
 					.setValue(this.limit)
-					.setPlaceholder("all")
+					.setPlaceholder("All")
 					.onChange((value) => (this.limit = value.replace(/[^0-9]/g, "")))
 			);
 
@@ -713,7 +713,7 @@ export class InsertChartModal extends Modal {
 			.addText((text) =>
 				text
 					.setValue(this.limit)
-					.setPlaceholder("all")
+					.setPlaceholder("All")
 					.onChange((value) => {
 						this.limit = value.replace(/[^0-9]/g, "");
 						redraw();

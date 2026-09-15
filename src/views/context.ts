@@ -43,15 +43,6 @@ export function rowContextMenu(ctx: ViewContext, path: string, event: MouseEvent
 	menu.addSeparator();
 	menu.addItem((item) =>
 		item
-			.setTitle("Copy link")
-			.setIcon("link")
-			.onClick(async () => {
-				const file = ctx.store.getFile(path);
-				if (file) await navigator.clipboard.writeText(`[[${file.basename}]]`);
-			})
-	);
-	menu.addItem((item) =>
-		item
 			.setTitle("Delete")
 			.setIcon("trash")
 			.onClick(async () => {

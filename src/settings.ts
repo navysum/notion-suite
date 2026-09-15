@@ -1,4 +1,10 @@
-import { App, PluginSettingTab, Setting, Notice } from "obsidian";
+import {
+	App,
+	Notice,
+	PluginSettingTab,
+	Setting,
+	SettingDefinitionItem,
+} from "obsidian";
 import type NotionForObsidian from "./main";
 import { DatabaseSchema } from "./types";
 import { ImportFolderModal } from "./ui/modals";
@@ -23,131 +29,157 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	databases: [],
 };
 
+/** Setting keys the declarative controls bind to. */
+type SettingKey = keyof Omit<NotionSettings, "databases" | "showRowNumbers">;
+
+/**
+ * The settings tab, declared rather than drawn.
+ *
+ * `display()` is deliberately not overridden. Obsidian calls
+ * `getSettingDefinitions()` from its own `display()`, and again when the tab is
+ * registered so the settings can be indexed — which is what puts them in the
+ * settings search. Drawing the tab by hand would mean maintaining the same UI
+ * twice and keeping the two in step.
+ */
 export class NotionSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: NotionForObsidian) {
 		super(app, plugin);
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new Setting(containerEl).setName("Editing").setHeading();
-
-		new Setting(containerEl)
-			.setName("Slash command menu")
-			.setDesc("Type the trigger character in the editor to insert blocks, views and charts.")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.enableSlashMenu).onChange(async (value) => {
-					this.plugin.settings.enableSlashMenu = value;
-					await this.plugin.saveSettings();
-				})
-			);
-
-		new Setting(containerEl)
-			.setName("Trigger character")
-			.setDesc("Defaults to “/”, matching Notion. A single character.")
-			.addText((text) =>
-				text
-					.setValue(this.plugin.settings.slashTrigger)
-					.setPlaceholder("/")
-					.onChange(async (value) => {
-						// An empty or multi-character trigger would fire on every keystroke.
-						this.plugin.settings.slashTrigger = value.trim().slice(0, 1) || "/";
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Notion typography")
-			.setDesc("Apply Notion-like spacing, headings and callout styling to notes.")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.notionTypography).onChange(async (value) => {
-					this.plugin.settings.notionTypography = value;
-					await this.plugin.saveSettings();
-					this.plugin.applyBodyClasses();
-				})
-			);
-
-		new Setting(containerEl).setName("Databases").setHeading();
-
-		new Setting(containerEl)
-			.setName("Default folder")
-			.setDesc("New databases are created inside this folder.")
-			.addText((text) =>
-				text
-					.setValue(this.plugin.settings.defaultDatabaseFolder)
-					.setPlaceholder("Databases")
-					.onChange(async (value) => {
-						this.plugin.settings.defaultDatabaseFolder = value.trim();
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Compact rows")
-			.setDesc("Tighter row height in table and list views.")
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.compactRows).onChange(async (value) => {
-					this.plugin.settings.compactRows = value;
-					await this.plugin.saveSettings();
-					this.plugin.applyBodyClasses();
-				})
-			);
-
-		new Setting(containerEl)
-			.setName("Import an existing folder")
-			.setDesc("Turn a folder of notes (for example a Notion export) into a database.")
-			.addButton((button) =>
-				button
-					.setButtonText("Import folder")
-					.onClick(() => {
-						new ImportFolderModal(this.app, this.plugin.store, () => this.display()).open();
-					})
-			);
-
-		this.renderDatabaseList(containerEl);
+	/** Values come from, and go back to, the plugin's own settings object. */
+	getControlValue(key: string): unknown {
+		return this.plugin.settings[key as SettingKey];
 	}
 
-	private renderDatabaseList(containerEl: HTMLElement): void {
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		const settings = this.plugin.settings as unknown as Record<string, unknown>;
+		settings[key] = value;
+		await this.plugin.saveSettings();
+		// Two of these settings are expressed as body classes, not behaviour.
+		this.plugin.applyBodyClasses();
+	}
+
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				type: "group",
+				heading: "Editing",
+				items: [
+					{
+						name: "Slash command menu",
+						desc: "Type the trigger character in the editor to insert blocks, views and charts.",
+						aliases: ["slash", "commands", "menu", "insert"],
+						control: { type: "toggle", key: "enableSlashMenu", defaultValue: true },
+					},
+					{
+						name: "Trigger character",
+						desc: "Defaults to “/”, matching Notion. A single character.",
+						aliases: ["slash", "shortcut"],
+						control: {
+							type: "text",
+							key: "slashTrigger",
+							placeholder: "/",
+							defaultValue: "/",
+							// An empty or multi-character trigger would fire on
+							// every keystroke, so reject it rather than silently
+							// rewriting what the user typed.
+							validate: (value) =>
+								value.trim().length === 1
+									? undefined
+									: "Enter exactly one character.",
+						},
+					},
+					{
+						name: "Notion typography",
+						desc: "Apply Notion-like spacing, headings and callout styling to notes.",
+						aliases: ["fonts", "headings", "callouts", "style"],
+						control: { type: "toggle", key: "notionTypography", defaultValue: true },
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Databases",
+				items: [
+					{
+						name: "Default folder",
+						desc: "New databases are created inside this folder.",
+						aliases: ["location", "path"],
+						control: {
+							type: "folder",
+							key: "defaultDatabaseFolder",
+							placeholder: "Databases",
+							defaultValue: "Databases",
+						},
+					},
+					{
+						name: "Compact rows",
+						desc: "Tighter row height in table and list views.",
+						aliases: ["density", "spacing"],
+						control: { type: "toggle", key: "compactRows", defaultValue: false },
+					},
+					{
+						name: "Import an existing folder",
+						desc: "Turn a folder of notes (for example a Notion export) into a database.",
+						aliases: ["notion", "export", "migrate"],
+						action: () => {
+							new ImportFolderModal(this.app, this.plugin.store, () => this.update()).open();
+						},
+					},
+				],
+			},
+			this.databaseList(),
+		];
+	}
+
+	/**
+	 * The databases themselves, as a list the user can delete from.
+	 *
+	 * Rendered through `render` rather than as bound controls: these rows are
+	 * data the plugin owns, not preferences, so there is no settings key to
+	 * bind and the row contents depend on the vault.
+	 */
+	private databaseList(): SettingDefinitionItem {
 		const databases = this.plugin.store.all();
-		new Setting(containerEl).setName(`Your databases (${databases.length})`).setHeading();
-
-		if (databases.length === 0) {
-			containerEl.createEl("p", {
-				cls: "nfo-modal-hint",
-				text: "None yet. Use the command “Notion: New database”, or type /database in a note.",
-			});
-			return;
-		}
-
-		for (const schema of databases) {
-			const setting = new Setting(containerEl)
-				.setName(`${schema.icon ?? "🗂️"} ${schema.name}`)
-				.setDesc(`${schema.folder} · ${schema.properties.length} properties`);
-
-			setting.addButton((button) =>
-				button
-					.setButtonText("Copy view block")
-					.onClick(async () => {
-						await navigator.clipboard.writeText(
-							`\`\`\`notion-db\ndatabase: ${schema.name}\nview: table\n\`\`\``
-						);
-						new Notice("View block copied to clipboard.");
-					})
-			);
-
-			setting.addButton((button) =>
-				button
-					.setButtonText("Remove")
-					.setWarning()
-					.onClick(async () => {
-						// Only the schema is removed; the notes in the folder are left alone.
-						await this.plugin.store.deleteDatabase(schema.id);
-						new Notice(`Removed the “${schema.name}” database definition. Your notes are untouched.`);
-						this.display();
-					})
-			);
-		}
+		return {
+			type: "list",
+			heading: `Your databases (${databases.length})`,
+			emptyState: "None yet. Use the command “Notion: New database”, or type /database in a note.",
+			addItem: {
+				name: "New database",
+				action: () => {
+					this.plugin.commandNewDatabase();
+				},
+			},
+			onDelete: (index: number) => {
+				const schema = databases[index];
+				if (!schema) return;
+				void (async () => {
+					// Only the schema is forgotten; the notes stay where they are.
+					await this.plugin.store.deleteDatabase(schema.id);
+					new Notice(
+						`Removed the “${schema.name}” database definition. Your notes are untouched.`
+					);
+					this.update();
+				})();
+			},
+			items: databases.map((schema) => ({
+				name: `${schema.icon ?? "🗂️"} ${schema.name}`,
+				desc: `${schema.folder} · ${schema.properties.length} ${
+					schema.properties.length === 1 ? "property" : "properties"
+				}`,
+				aliases: [schema.folder, ...schema.properties.map((p) => p.name)],
+				render: (setting: Setting) => {
+					setting.addExtraButton((button) =>
+						button
+							.setIcon("pencil")
+							.setTooltip("Add a property")
+							.onClick(() => {
+								this.plugin.openPropertyEditor(schema);
+							})
+					);
+				},
+			})),
+		};
 	}
 }
