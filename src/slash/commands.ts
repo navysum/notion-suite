@@ -15,7 +15,13 @@ export interface SlashCommand {
 	aliases?: string[];
 	insert?: string;
 	/** Commands that need UI (modals) declare an action id handled by the plugin. */
-	action?: "new-database" | "insert-view" | "insert-chart" | "link-database" | "new-row";
+	action?:
+		| "new-database"
+		| "insert-view"
+		| "insert-chart"
+		| "link-database"
+		| "new-row"
+		| "page-style";
 }
 
 export const CURSOR = "$cursor$";
@@ -94,6 +100,69 @@ export function slashCommands(): SlashCommand[] {
 			group: "Basic blocks",
 			aliases: ["collapse", "fold", "details"],
 			insert: `> [!note]- ${CURSOR}\n> Hidden content`,
+		},
+		{
+			id: "toggle-h1",
+			title: "Toggle heading 1",
+			description: "A big heading that folds its section away.",
+			icon: "chevron-down",
+			group: "Basic blocks",
+			aliases: ["collapsible heading", "fold"],
+			insert: `> [!nfo-h1]- ${CURSOR}\n> Content`,
+		},
+		{
+			id: "toggle-h2",
+			title: "Toggle heading 2",
+			description: "A medium heading that folds its section away.",
+			icon: "chevron-down",
+			group: "Basic blocks",
+			aliases: ["collapsible heading", "fold"],
+			insert: `> [!nfo-h2]- ${CURSOR}\n> Content`,
+		},
+		{
+			id: "toggle-h3",
+			title: "Toggle heading 3",
+			description: "A small heading that folds its section away.",
+			icon: "chevron-down",
+			group: "Basic blocks",
+			aliases: ["collapsible heading", "fold"],
+			insert: `> [!nfo-h3]- ${CURSOR}\n> Content`,
+		},
+		{
+			id: "toc",
+			title: "Table of contents",
+			description: "Links to every heading in this note.",
+			icon: "list-tree",
+			group: "Basic blocks",
+			aliases: ["outline", "contents", "index"],
+			insert: "```notion-toc\ndepth: 3\n```",
+		},
+		{
+			id: "breadcrumb",
+			title: "Breadcrumb",
+			description: "Shows where this note sits in your vault.",
+			icon: "chevrons-right",
+			group: "Basic blocks",
+			aliases: ["path", "trail", "location"],
+			insert: "```notion-breadcrumb\n```",
+		},
+		{
+			id: "page-icon",
+			title: "Page icon and cover",
+			description: "Add an emoji and a banner image to this note.",
+			icon: "image",
+			group: "Basic blocks",
+			aliases: ["banner", "emoji", "header", "cover"],
+			action: "page-style",
+		},
+		{
+			id: "widget",
+			title: "Widget",
+			description: "A metric, progress bar, countdown, list or button.",
+			icon: "layout-dashboard",
+			group: "Databases",
+			aliases: ["dashboard", "card", "counter", "stat"],
+			insert: "```notion-widget\nkind: metric\ndatabase: \naggregate: count_all\nlabel: Total\n```",
 		},
 		{
 			id: "quote",

@@ -16,6 +16,8 @@ export interface NotionSettings {
 	notionTypography: boolean;
 	sidePeek: boolean;
 	openSidebarOnStart: boolean;
+	showBanners: boolean;
+	bannerHeight: number;
 	compactRows: boolean;
 	showRowNumbers: boolean;
 	databases: DatabaseSchema[];
@@ -28,6 +30,8 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	notionTypography: true,
 	sidePeek: true,
 	openSidebarOnStart: true,
+	showBanners: true,
+	bannerHeight: 180,
 	compactRows: false,
 	showRowNumbers: false,
 	databases: [],
@@ -91,6 +95,24 @@ export class NotionSettingTab extends PluginSettingTab {
 								value.trim().length === 1
 									? undefined
 									: "Enter exactly one character.",
+						},
+					},
+					{
+						name: "Page icons and covers",
+						desc: "Show an emoji and a banner image at the top of notes that set them in frontmatter.",
+						aliases: ["banner", "emoji", "header", "cover", "image"],
+						control: { type: "toggle", key: "showBanners", defaultValue: true },
+					},
+					{
+						name: "Cover height",
+						desc: "How tall the banner image is, in pixels.",
+						aliases: ["banner", "size"],
+						control: {
+							type: "number",
+							key: "bannerHeight",
+							defaultValue: 180,
+							validate: (value) =>
+								value >= 60 && value <= 600 ? undefined : "Choose a height between 60 and 600.",
 						},
 					},
 					{

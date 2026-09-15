@@ -31,6 +31,9 @@ import { addEditButton, replaceBlock, setBlockKey, updateBlockBody } from "./vie
 import { DatabaseSchema } from "./types";
 import { DATABASE_VIEW_TYPE, DatabaseItemView, openDatabaseTab } from "./views/databaseView";
 import { SIDEBAR_VIEW_TYPE, DatabaseSidebarView } from "./views/sidebar";
+import { renderBreadcrumb, renderTableOfContents } from "./views/pageBlocks";
+import { registerBanners } from "./ui/pageBanner";
+import { PageStyleModal } from "./ui/pageStyleModal";
 
 export default class NotionForObsidian extends Plugin {
 	settings: NotionSettings = { ...DEFAULT_SETTINGS };
@@ -50,6 +53,12 @@ export default class NotionForObsidian extends Plugin {
 		);
 		this.registerMarkdownCodeBlockProcessor("notion-chart", (source, el, ctx) =>
 			this.renderChartBlock(source, el, ctx)
+		);
+		this.registerMarkdownCodeBlockProcessor("notion-toc", (source, el, ctx) =>
+			renderTableOfContents(this.app, source, el, ctx)
+		);
+		this.registerMarkdownCodeBlockProcessor("notion-breadcrumb", (_source, el, ctx) =>
+			renderBreadcrumb(this.app, el, ctx)
 		);
 		this.registerMarkdownCodeBlockProcessor("notion-widget", (source, el, ctx) =>
 			this.renderWidgetBlock(source, el, ctx)
@@ -74,6 +83,11 @@ export default class NotionForObsidian extends Plugin {
 			(leaf) => new DatabaseItemView(leaf, this)
 		);
 		this.registerView(SIDEBAR_VIEW_TYPE, (leaf) => new DatabaseSidebarView(leaf, this));
+
+		registerBanners(this, () => ({
+			showBanners: this.settings.showBanners,
+			bannerHeight: this.settings.bannerHeight,
+		}));
 
 		this.registerVaultListeners();
 		this.registerCommands();
@@ -311,6 +325,38 @@ export default class NotionForObsidian extends Plugin {
 		});
 
 		this.addCommand({
+			id: "page-style",
+			name: "Set this note's icon and cover",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				if (!checking) new PageStyleModal(this.app, file).open();
+				return true;
+			},
+		});
+
+		// Bound to nothing by default: Obsidian asks plugins not to claim
+		// hotkeys, since anything popular collides with someone's setup.
+		this.addCommand({
+			id: "toggle-done",
+			name: "Toggle the checkbox property on the active row",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const schema = this.store
+					.all()
+					.find((candidate) => file.path.startsWith(`${candidate.folder}/`));
+				const prop = schema?.properties.find((p) => p.type === "checkbox");
+				if (!schema || !prop) return false;
+				if (!checking) {
+					const row = this.store.rows(schema).find((r) => r.path === file.path);
+					void this.store.setValue(schema, file.path, prop.id, !row?.values[prop.id]);
+				}
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: "refresh-databases",
 			name: "Refresh all database views",
 			callback: () => {
@@ -381,6 +427,12 @@ export default class NotionForObsidian extends Plugin {
 			case "insert-chart":
 				new InsertChartModal(this.app, this.store, (block) => insertAtCursor(editor, block)).open();
 				break;
+			case "page-style": {
+				const file = this.app.workspace.getActiveFile();
+				if (file) new PageStyleModal(this.app, file).open();
+				else new Notice("Open a note first.");
+				break;
+			}
 			case "new-row":
 				this.pickDatabase((schema) => {
 					new NewRowModal(this.app, this.store, schema, (file: TFile) => {
