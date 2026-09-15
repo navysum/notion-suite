@@ -11,6 +11,7 @@ export type PropertyType =
 	| "text"
 	| "number"
 	| "select"
+	| "status"
 	| "multiselect"
 	| "date"
 	| "checkbox"
@@ -29,6 +30,7 @@ export const PROPERTY_TYPES: PropertyType[] = [
 	"text",
 	"number",
 	"select",
+	"status",
 	"multiselect",
 	"date",
 	"checkbox",
@@ -48,6 +50,7 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
 	text: "Text",
 	number: "Number",
 	select: "Select",
+	status: "Status",
 	multiselect: "Multi-select",
 	date: "Date",
 	checkbox: "Checkbox",
@@ -187,7 +190,9 @@ export interface PropertyDef {
 	rollupProperty?: string;
 	/** For `rollup`: how the gathered values are collapsed into one. */
 	rollupFunction?: RollupFunction;
-	/** For `formula`: a tiny expression evaluated per row. */
+	/** For `status`: which stage each option belongs to. */
+	statusStages?: Record<string, StatusStage>;
+	/** For `formula`: an expression evaluated per row. */
 	formula?: string;
 	numberFormat?: "plain" | "percent" | "currency";
 	hidden?: boolean;
@@ -228,7 +233,21 @@ export interface SortRule {
 	direction: "asc" | "desc";
 }
 
-export type ViewType = "table" | "board" | "gallery" | "list" | "calendar";
+export type ViewType = "table" | "board" | "gallery" | "list" | "calendar" | "timeline";
+
+/**
+ * The three stages a status property's options are bucketed into.
+ * Boards order their columns by this, and "is not done" filters read it.
+ */
+export type StatusStage = "todo" | "doing" | "done";
+
+export const STATUS_STAGES: StatusStage[] = ["todo", "doing", "done"];
+
+export const STATUS_STAGE_LABELS: Record<StatusStage, string> = {
+	todo: "To do",
+	doing: "In progress",
+	done: "Complete",
+};
 
 export interface ViewConfig {
 	id: string;
@@ -245,6 +264,29 @@ export interface ViewConfig {
 	coverProperty?: string;
 	cardSize?: "small" | "medium" | "large";
 	pageSize?: number;
+	/** Column footer calculations, keyed by property id. */
+	calculate?: Record<string, RollupFunction>;
+	/** Timeline view: the properties bounding each bar. */
+	timelineStart?: string;
+	timelineEnd?: string;
+	/** Timeline view: how much time one column covers. */
+	timelineScale?: "day" | "week" | "month";
+}
+
+/**
+ * A pre-filled row.
+ *
+ * Storage-wise a template is exactly what a row is -- frontmatter plus a body --
+ * so creating from one is a copy rather than a conversion.
+ */
+export interface RowTemplate {
+	id: string;
+	name: string;
+	icon?: string;
+	/** Property values applied to the new row. */
+	values: Record<string, unknown>;
+	/** Markdown placed in the new note's body. */
+	body?: string;
 }
 
 export interface DatabaseSchema {
@@ -258,6 +300,8 @@ export interface DatabaseSchema {
 	views: ViewConfig[];
 	/** Frontmatter applied to every newly created row. */
 	defaultTemplate?: Record<string, unknown>;
+	/** Named pre-filled rows, offered from the "New" button. */
+	rowTemplates?: RowTemplate[];
 	createdAt: number;
 }
 
