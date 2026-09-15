@@ -15,6 +15,7 @@ export interface NotionSettings {
 	defaultDatabaseFolder: string;
 	notionTypography: boolean;
 	sidePeek: boolean;
+	openSidebarOnStart: boolean;
 	compactRows: boolean;
 	showRowNumbers: boolean;
 	databases: DatabaseSchema[];
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	defaultDatabaseFolder: "Databases",
 	notionTypography: true,
 	sidePeek: true,
+	openSidebarOnStart: true,
 	compactRows: false,
 	showRowNumbers: false,
 	databases: [],
@@ -113,6 +115,12 @@ export class NotionSettingTab extends PluginSettingTab {
 							placeholder: "Databases",
 							defaultValue: "Databases",
 						},
+					},
+					{
+						name: "Show the databases sidebar on startup",
+						desc: "Keeps every database one click away, the way Notion's sidebar does.",
+						aliases: ["sidebar", "panel", "browse"],
+						control: { type: "toggle", key: "openSidebarOnStart", defaultValue: true },
 					},
 					{
 						name: "Open rows beside the view",

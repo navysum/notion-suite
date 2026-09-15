@@ -29,6 +29,8 @@ import {
 import { PropertyModal } from "./ui/propertyModal";
 import { addEditButton, replaceBlock, setBlockKey, updateBlockBody } from "./views/blockEdit";
 import { DatabaseSchema } from "./types";
+import { DATABASE_VIEW_TYPE, DatabaseItemView, openDatabaseTab } from "./views/databaseView";
+import { SIDEBAR_VIEW_TYPE, DatabaseSidebarView } from "./views/sidebar";
 
 export default class NotionForObsidian extends Plugin {
 	settings: NotionSettings = { ...DEFAULT_SETTINGS };
@@ -67,10 +69,22 @@ export default class NotionForObsidian extends Plugin {
 			})
 		);
 
+		this.registerView(
+			DATABASE_VIEW_TYPE,
+			(leaf) => new DatabaseItemView(leaf, this)
+		);
+		this.registerView(SIDEBAR_VIEW_TYPE, (leaf) => new DatabaseSidebarView(leaf, this));
+
 		this.registerVaultListeners();
 		this.registerCommands();
 
-		this.addRibbonIcon("database", "Notion: new database", () => this.commandNewDatabase());
+		this.addRibbonIcon("database", "Notion Suite: databases", () => void this.revealSidebar());
+
+		// Open the sidebar on first run so the databases are discoverable at all
+		// rather than waiting to be found in the command palette.
+		this.app.workspace.onLayoutReady(() => {
+			if (this.settings.openSidebarOnStart) void this.revealSidebar(false);
+		});
 		this.addSettingTab(new NotionSettingTab(this.app, this));
 		this.applyBodyClasses();
 	}
@@ -206,6 +220,37 @@ export default class NotionForObsidian extends Plugin {
 
 	private registerCommands(): void {
 		this.addCommand({
+			id: "show-databases",
+			name: "Show the databases sidebar",
+			callback: () => void this.revealSidebar(),
+		});
+
+		this.addCommand({
+			id: "open-database",
+			name: "Open a database",
+			callback: () => {
+				this.pickDatabase((schema) => void openDatabaseTab(this, schema));
+			},
+		});
+
+		this.addCommand({
+			id: "assign-unique-ids",
+			name: "Assign unique IDs to existing rows",
+			callback: () => {
+				this.pickDatabase((schema) => {
+					void (async () => {
+						const filled = await this.store.backfillUniqueIds(schema);
+						new Notice(
+							filled === 0
+								? "Every row already has an ID."
+								: `Assigned IDs to ${filled} ${filled === 1 ? "row" : "rows"}.`
+						);
+					})();
+				});
+			},
+		});
+
+		this.addCommand({
 			id: "new-database",
 			name: "New database",
 			callback: () => this.commandNewDatabase(),
@@ -286,6 +331,19 @@ export default class NotionForObsidian extends Plugin {
 				else new Notice(`Created “${schema.name}”. Open a note and run “Insert database view”.`);
 			}
 		).open();
+	}
+
+	/** Show the databases sidebar, opening it in the right pane if needed. */
+	async revealSidebar(activate = true): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(SIDEBAR_VIEW_TYPE);
+		if (existing.length > 0) {
+			if (activate) await this.app.workspace.revealLeaf(existing[0]);
+			return;
+		}
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (!leaf) return;
+		await leaf.setViewState({ type: SIDEBAR_VIEW_TYPE, active: activate });
+		if (activate) await this.app.workspace.revealLeaf(leaf);
 	}
 
 	/** Open the property editor for a database, used by the settings tab. */
