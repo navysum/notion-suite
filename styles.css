@@ -1138,3 +1138,140 @@ body.nfo-typography hr {
 }
 
 .nfo-timeline-unscheduled-item:hover { background: var(--nfo-hover); }
+
+/* --- Widgets -------------------------------------------------------------- */
+
+/* A row of widget cards. Collapses to a single column on a phone. */
+.nfo-widgets {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	margin: 1em 0;
+}
+
+.nfo-widget-row-single { grid-template-columns: minmax(0, 1fr); }
+
+.nfo-widget {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 14px 16px;
+	border: 1px solid var(--nfo-border);
+	border-radius: var(--nfo-radius-lg);
+	background: var(--nfo-surface);
+	min-width: 0;
+}
+
+.nfo-widget-label {
+	font-size: 0.8em;
+	font-weight: 500;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	color: var(--nfo-muted);
+}
+
+.nfo-widget-figure {
+	display: flex;
+	align-items: baseline;
+	gap: 3px;
+	min-width: 0;
+}
+
+.nfo-widget-number {
+	font-size: 2em;
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.nfo-widget-affix { font-size: 1.1em; font-weight: 600; color: var(--nfo-muted); }
+.nfo-widget-sub { font-size: 0.85em; color: var(--nfo-muted); }
+
+/* --- Progress ------------------------------------------------------------- */
+
+.nfo-widget-progress-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.nfo-widget-percent { font-size: 1.5em; font-weight: 700; color: var(--text-normal); }
+
+.nfo-widget-track {
+	height: 8px;
+	border-radius: 99px;
+	background: var(--nfo-surface-alt);
+	overflow: hidden;
+}
+
+.nfo-widget-fill {
+	height: 100%;
+	border-radius: 99px;
+	background: var(--interactive-accent);
+	transition: width 200ms ease;
+}
+
+/* --- List ----------------------------------------------------------------- */
+
+.nfo-widget-list { display: flex; flex-direction: column; }
+
+.nfo-widget-item {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 5px 0;
+	border-bottom: 1px solid var(--nfo-border);
+	cursor: pointer;
+}
+
+.nfo-widget-item:last-child { border-bottom: none; }
+.nfo-widget-item:hover .nfo-widget-item-title { text-decoration: underline; }
+
+.nfo-widget-item-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nfo-widget-item-meta {
+	flex: 0 0 auto;
+	font-size: 0.85em;
+	color: var(--nfo-muted);
+}
+
+/* --- Button --------------------------------------------------------------- */
+
+.nfo-widget-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 8px 12px;
+	border-radius: var(--nfo-radius);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: 500;
+	cursor: pointer;
+	user-select: none;
+}
+
+.nfo-widget-button:hover { background: var(--interactive-accent-hover); }
+.nfo-widget-button-icon { display: flex; align-items: center; }
+.nfo-widget-button-icon svg { width: 16px; height: 16px; }
+
+/* --- States --------------------------------------------------------------- */
+
+.nfo-widget-empty { color: var(--nfo-muted); font-size: 0.9em; font-style: italic; }
+
+.nfo-widget-error {
+	color: var(--nfo-color-fg);
+	background: var(--nfo-color-red-bg);
+	border-radius: var(--nfo-radius);
+	padding: 8px 10px;
+	font-size: 0.88em;
+}
