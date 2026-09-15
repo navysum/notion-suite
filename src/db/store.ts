@@ -19,6 +19,24 @@ export const DERIVED_TYPES: PropertyType[] = ["formula", "rollup", "created", "u
  * Format a unique ID. The prefix is cosmetic; the number is what is stored,
  * so renaming the prefix later renumbers nothing.
  */
+/**
+ * The largest unique id any row already carries.
+ *
+ * Folded rather than spread into Math.max: a spread of one argument per row
+ * throws RangeError on a large database.
+ */
+export function highestUsedId(schema: DatabaseSchema, rows: DatabaseRow[]): number {
+	const idProps = schema.properties.filter((p) => p.type === "uniqueid");
+	let highest = 0;
+	for (const row of rows) {
+		for (const prop of idProps) {
+			const n = Number(row.values[prop.id]);
+			if (Number.isFinite(n) && n > highest) highest = n;
+		}
+	}
+	return highest;
+}
+
 export function formatUniqueId(prop: PropertyDef, value: unknown): string {
 	// Number(null) and Number("") are both 0, which is finite -- an unset id
 	// would render as a real-looking "TASK-0" without this guard.
@@ -317,13 +335,7 @@ export class DatabaseStore extends Events {
 	 * that gained the property after rows existed cannot hand out a duplicate.
 	 */
 	private async nextUniqueId(schema: DatabaseSchema): Promise<number> {
-		const used = this.rows(schema).flatMap((row) =>
-			schema.properties
-				.filter((p) => p.type === "uniqueid")
-				.map((p) => Number(row.values[p.id]))
-				.filter((n) => Number.isFinite(n))
-		);
-		const highest = used.length > 0 ? Math.max(...used) : 0;
+		const highest = highestUsedId(schema, this.rows(schema));
 		const next = Math.max(schema.nextId ?? 1, highest + 1);
 		await this.updateDatabase(schema.id, (target) => {
 			target.nextId = next + 1;
@@ -336,25 +348,37 @@ export class DatabaseStore extends Events {
 		const idProps = schema.properties.filter((p) => p.type === "uniqueid");
 		if (idProps.length === 0) return 0;
 
-		const missing = this.rows(schema)
+		const rows = this.rows(schema);
+		const missing = rows
 			.filter((row) => idProps.some((p) => !Number.isFinite(Number(row.values[p.id]))))
 			.sort((a, b) => a.ctime - b.ctime);
+		if (missing.length === 0) return 0;
+
+		// Work out the starting point once and count up in memory. Claiming
+		// each id individually would re-resolve every row and save the plugin's
+		// data to disk once per row, which on a large database reads as a hang.
+		let next = Math.max(schema.nextId ?? 1, highestUsedId(schema, rows) + 1);
 
 		for (const row of missing) {
 			const file = this.getFile(row.path);
 			if (!file) continue;
-			for (const prop of idProps) {
-				if (Number.isFinite(Number(row.values[prop.id]))) continue;
-				const id = await this.nextUniqueId(schema);
-				await this.app.fileManager.processFrontMatter(
-					file,
-					(frontmatter: Record<string, unknown>) => {
-						frontmatter[prop.id] = id;
-					}
-				);
-			}
+			const assign = idProps.filter((p) => !Number.isFinite(Number(row.values[p.id])));
+			if (assign.length === 0) continue;
+			const ids = assign.map(() => next++);
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(frontmatter: Record<string, unknown>) => {
+					assign.forEach((prop, i) => {
+						frontmatter[prop.id] = ids[i];
+					});
+				}
+			);
 		}
-		this.invalidate();
+
+		// One save at the end, not one per row.
+		await this.updateDatabase(schema.id, (target) => {
+			target.nextId = next;
+		});
 		return missing.length;
 	}
 

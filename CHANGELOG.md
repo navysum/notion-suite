@@ -3,6 +3,33 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.6.3
+
+A pass over the whole codebase looking for bugs rather than adding features.
+Six found and fixed.
+
+### Fixed
+
+- **A full-page database forgot itself constantly.** Its search box, collapsed
+  sub-items and ticked rows were stored against an element the view rebuilt on
+  every refresh — so typing a letter into the search box destroyed the thing
+  holding the search box's contents.
+- **Opening a row could hijack a pane in the left sidebar.** "Reuse an existing
+  side pane" matched any pane outside the main editor, which includes the left
+  sidebar, so glancing at a row could replace whatever you had pinned there.
+- **Assigning unique IDs to a large database appeared to hang.** Each row
+  re-resolved every row in the database and saved the plugin's data to disk, so
+  the work grew with the square of the row count. It now counts up in memory and
+  saves once.
+- **Column limits counted rows the board was hiding.** On a filtered board a
+  column could refuse a card while visibly holding two, because the limit was
+  counting cards the filter had removed.
+- **Deleting a row silently orphaned its sub-items.** They were left pointing at
+  a note that no longer existed and quietly became top-level rows. Deleting a
+  row with sub-items now says how many, and offers to take them too — and
+  dismissing that dialog cancels rather than choosing for you.
+- Removed a helper nothing used.
+
 ## 1.6.2
 
 ### Fixed
