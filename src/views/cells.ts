@@ -4,6 +4,7 @@ import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
 import { formatDate, toISODate } from "../utils/dates";
 import { ViewContext, openRow } from "./context";
+import { asText } from "../utils/text";
 
 const READ_ONLY: string[] = ["formula", "rollup", "created", "updated"];
 
@@ -95,7 +96,7 @@ function renderInput(
 	display.addEventListener("click", () => {
 		display.hide();
 		const input = container.createEl("input", { cls: "nfo-cell-input", type: inputType });
-		input.value = value === null || value === undefined ? "" : String(value);
+		input.value = asText(value);
 		input.focus();
 		input.select();
 
@@ -136,7 +137,7 @@ function renderLinkish(
 	value: unknown
 ): void {
 	const wrapper = container.createDiv({ cls: "nfo-cell-linkish" });
-	const text = value ? String(value) : "";
+	const text = asText(value);
 	if (text) {
 		const href =
 			prop.type === "email"
@@ -326,7 +327,7 @@ function renderDate(
 	display.addEventListener("click", () => {
 		display.hide();
 		const input = container.createEl("input", { cls: "nfo-cell-input", type: "date" });
-		input.value = value ? String(value).slice(0, 10) : toISODate(new Date());
+		input.value = asText(value).slice(0, 10) || toISODate(new Date());
 		input.focus();
 		if (typeof input.showPicker === "function") {
 			// Not available in every Electron build; failure here is cosmetic.

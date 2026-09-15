@@ -4,6 +4,7 @@ import { ViewContext, openRow, rowContextMenu } from "./context";
 import { addMonths, calendarGrid, monthTitle, parseDate, sameDay, toISODate, WEEKDAY_LABELS } from "../utils/dates";
 import { findProperty } from "../db/query";
 import { autoColor } from "../utils/dom";
+import { asText } from "../utils/text";
 
 /**
  * Which month each calendar is showing.
@@ -95,13 +96,15 @@ export function renderCalendar(
 		const header = cell.createDiv({ cls: "nfo-calendar-daynum", text: String(day.getDate()) });
 		const addBtn = header.createSpan({ cls: "nfo-calendar-add" });
 		setIcon(addBtn, "plus");
-		addBtn.addEventListener("click", async (evt) => {
+		addBtn.addEventListener("click", (evt) => {
 			evt.stopPropagation();
-			const file = await ctx.store.createRow(ctx.schema, "Untitled", {
-				[dateProp.id]: toISODate(day),
-			});
-			ctx.refresh();
-			if (file) await ctx.app.workspace.getLeaf(false).openFile(file);
+			void (async () => {
+				const file = await ctx.store.createRow(ctx.schema, "Untitled", {
+					[dateProp.id]: toISODate(day),
+				});
+				ctx.refresh();
+				if (file) await ctx.app.workspace.getLeaf(false).openFile(file);
+			})();
 		});
 
 		for (const row of byDay.get(toISODate(day)) ?? []) {
@@ -109,8 +112,8 @@ export function renderCalendar(
 			if (colorProp) {
 				const value = row.values[colorProp.id];
 				if (value) {
-					const option = ctx.store.optionFor(colorProp, String(value));
-					chip.addClass(`nfo-color-${option?.color ?? autoColor(String(value))}`);
+					const option = ctx.store.optionFor(colorProp, asText(value));
+					chip.addClass(`nfo-color-${option?.color ?? autoColor(asText(value))}`);
 				}
 			}
 			chip.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
