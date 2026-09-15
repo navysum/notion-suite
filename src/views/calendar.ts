@@ -5,15 +5,7 @@ import { addMonths, calendarGrid, monthTitle, parseDate, sameDay, toISODate, WEE
 import { findProperty } from "../db/query";
 import { autoColor } from "../utils/dom";
 import { asText } from "../utils/text";
-
-/**
- * Which month each calendar is showing.
- *
- * Keyed on the code block's own element (`stateHost`), not on the container we
- * draw into: the container is rebuilt on every refresh, so state stored against
- * it would be discarded the moment the user clicked "next month".
- */
-const monthState = new WeakMap<HTMLElement, Date>();
+import { SurfaceState } from "./viewState";
 
 export function renderCalendar(
 	container: HTMLElement,
@@ -21,7 +13,7 @@ export function renderCalendar(
 	view: ViewConfig,
 	rows: DatabaseRow[],
 	properties: PropertyDef[],
-	stateHost: HTMLElement
+	state: SurfaceState
 ): void {
 	const dateKey =
 		view.dateProperty ??
@@ -46,8 +38,11 @@ export function renderCalendar(
 	}
 
 	const host = container.createDiv({ cls: "nfo-calendar" });
-	const current = monthState.get(stateHost) ?? new Date();
-	monthState.set(stateHost, current);
+	// The month lives on the surface state, which the renderer resolves once
+	// against an element that outlives the render. Keying it on anything drawn
+	// here would throw it away on the very refresh it has to survive.
+	const current = state.calendarMonth ?? new Date();
+	state.calendarMonth = current;
 
 	const nav = host.createDiv({ cls: "nfo-calendar-nav" });
 	const prev = nav.createDiv({ cls: "nfo-calendar-nav-btn" });
@@ -58,15 +53,15 @@ export function renderCalendar(
 	const todayBtn = nav.createDiv({ cls: "nfo-calendar-today", text: "Today" });
 
 	prev.addEventListener("click", () => {
-		monthState.set(stateHost, addMonths(current, -1));
+		state.calendarMonth = addMonths(current, -1);
 		ctx.refresh();
 	});
 	next.addEventListener("click", () => {
-		monthState.set(stateHost, addMonths(current, 1));
+		state.calendarMonth = addMonths(current, 1);
 		ctx.refresh();
 	});
 	todayBtn.addEventListener("click", () => {
-		monthState.set(stateHost, new Date());
+		state.calendarMonth = new Date();
 		ctx.refresh();
 	});
 

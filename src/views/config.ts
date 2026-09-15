@@ -191,6 +191,23 @@ function splitTopLevel(text: string, conjunction: "and" | "or"): string[] {
 	return parts.filter(Boolean);
 }
 
+/**
+ * Parse the filter editor's textarea, one node per line.
+ *
+ * This shares `parseFilters` with the code-block path on purpose. The textarea
+ * is filled by `filterToText`, which puts a nested filter on a single line as
+ * `(A or B) and C`; parsing a line with `parseFilterShorthand` alone would read
+ * that as a single rule named "(A" and silently change which rows match.
+ */
+export function parseFilterLines(text: string): FilterGroup | undefined {
+	return parseFilters(
+		text
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean)
+	);
+}
+
 function parseFilters(raw: unknown): FilterGroup | undefined {
 	if (!raw) return undefined;
 

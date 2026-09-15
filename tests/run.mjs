@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(here, ".build");
 mkdirSync(outDir, { recursive: true });
 
-const suites = ["logic", "rollup", "formula", "widget"];
+const suites = ["logic", "rollup", "formula", "widget", "guards", "roundtrip"];
 const outFiles = suites.map((name) => path.join(outDir, `${name}.test.cjs`));
 
 await esbuild.build({

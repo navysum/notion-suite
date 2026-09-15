@@ -11,20 +11,7 @@ import { renderTimeline } from "./timeline";
 import { formatValue } from "../db/value";
 import { PropertyModal } from "../ui/propertyModal";
 import { addEditButton } from "./blockEdit";
-
-/** Per-block UI state that should survive a re-render but not be persisted. */
-interface BlockState {
-	search: string;
-	viewType?: ViewType;
-	/** Row whose title should open for editing on the next render. */
-	focusRow?: string;
-	/** Sub-item rows the user has collapsed, by path. */
-	collapsed: Set<string>;
-	/** Rows ticked for a bulk edit, by path. */
-	selected: Set<string>;
-}
-
-const blockState = new WeakMap<HTMLElement, BlockState>();
+import { SurfaceState, surfaceState } from "./viewState";
 
 export function renderDatabaseView(
 	container: HTMLElement,
@@ -34,9 +21,10 @@ export function renderDatabaseView(
 	container.empty();
 	container.addClass("nfo-view");
 
-	const state =
-		blockState.get(container) ?? { search: "", collapsed: new Set<string>(), selected: new Set<string>() };
-	blockState.set(container, state);
+	// `container` is the surface's stable host: the renderer empties it but never
+	// replaces it. Everything below reads the state off `ctx`, so no sub-renderer
+	// has an element to key state on. See viewState.ts.
+	const state = surfaceState(container);
 	const activeType = state.viewType ?? view.type;
 
 	// A freshly created row asks to be renamed; the table consumes this once.
@@ -69,12 +57,10 @@ export function renderDatabaseView(
 			renderList(bodyEl, ctx, view, rows, properties);
 			break;
 		case "calendar":
-			// `container` is the stable code-block element; the calendar keeps its
-			// current month against it so navigation survives a re-render.
-			renderCalendar(bodyEl, ctx, view, rows, properties, container);
+			renderCalendar(bodyEl, ctx, view, rows, properties, state);
 			break;
 		case "timeline":
-			renderTimeline(bodyEl, ctx, view, rows, properties, container);
+			renderTimeline(bodyEl, ctx, view, rows, properties, state);
 			break;
 		default:
 			renderTable(bodyEl, ctx, view, rows, properties);
@@ -121,7 +107,7 @@ function renderToolbar(
 	ctx: ViewContext,
 	view: ViewConfig,
 	activeType: ViewType,
-	state: BlockState,
+	state: SurfaceState,
 	rowCount: number
 ): void {
 	const bar = container.createDiv({ cls: "nfo-toolbar" });

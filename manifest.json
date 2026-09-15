@@ -1,7 +1,7 @@
 {
 	"id": "notion-suite",
 	"name": "Notion Suite",
-	"version": "1.6.3",
+	"version": "1.6.4",
 	"minAppVersion": "1.13.0",
 	"description": "Notion-style databases with board, calendar and gallery views, relations, rollups, charts and a slash command menu for your notes.",
 	"author": "navysum",
