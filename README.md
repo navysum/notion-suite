@@ -70,6 +70,12 @@ without the plugin. That is the escape hatch Notion never gave you.
 
 ## 2. Installing it
 
+> **Requires Obsidian 1.13.0 or later.** The settings tab uses the declarative
+> settings API, which is what puts your settings in Obsidian's search. If you
+> are on an older build, version 1.2.1 is functionally identical apart from
+> that.
+
+
 ### Option A — BRAT (recommended until the directory listing lands)
 
 BRAT installs a plugin straight from a GitHub repository and keeps it updated,
@@ -567,17 +573,19 @@ Everything else in this README works today.
 
 ## 10b. What this plugin touches
 
-Worth stating plainly, since the community directory lists it as a behaviour:
+Worth stating plainly, since the community directory publishes a behaviour
+report for every listed plugin:
 
 - **Your vault files.** It creates and edits notes in your database folders, and
   writes property values into their frontmatter. That is the entire point of it.
-- **Your clipboard — write only.** Two buttons put text there: "Copy link" on a
-  row, and "Copy view block" in settings. Nothing ever *reads* your clipboard.
 - **The network: never.** No telemetry, no accounts, no remote calls, no
   external assets. Charts are drawn locally as SVG, with no charting library.
-  You can verify this yourself: the directory's review reports "no suspicious
-  network patterns", and reproduces the released `main.js` byte-for-byte from
-  this repository's source.
+- **Your clipboard: never.** Nothing is read from or written to it.
+
+You do not have to take that on trust. The directory's review reports no
+suspicious network patterns, no obfuscation, and reproduces the released
+`main.js` byte-for-byte from this repository — so the code you can read here is
+provably the code you are running.
 
 ## 11. Settings
 

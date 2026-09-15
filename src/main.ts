@@ -210,9 +210,7 @@ export default class NotionForObsidian extends Plugin {
 			id: "add-property",
 			name: "Add a property to a database",
 			callback: () => {
-				this.pickDatabase((schema) => {
-					new PropertyModal(this.app, this.store, schema, null, () => this.store.invalidate()).open();
-				});
+				this.pickDatabase((schema) => this.openPropertyEditor(schema));
 			},
 		});
 
@@ -244,7 +242,7 @@ export default class NotionForObsidian extends Plugin {
 		});
 	}
 
-	private commandNewDatabase(): void {
+	commandNewDatabase(): void {
 		const editor = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
 		new NewDatabaseModal(
 			this.app,
@@ -255,6 +253,11 @@ export default class NotionForObsidian extends Plugin {
 				else new Notice(`Created “${schema.name}”. Open a note and run “Insert database view”.`);
 			}
 		).open();
+	}
+
+	/** Open the property editor for a database, used by the settings tab. */
+	openPropertyEditor(schema: DatabaseSchema): void {
+		new PropertyModal(this.app, this.store, schema, null, () => this.store.invalidate()).open();
 	}
 
 	private pickDatabase(onPick: (schema: DatabaseSchema) => void): void {

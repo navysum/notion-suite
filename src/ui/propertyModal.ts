@@ -117,7 +117,7 @@ export class PropertyModal extends Modal {
 			footer.addButton((button) =>
 				button
 					.setButtonText("Delete")
-					.setWarning()
+					.setDestructive()
 					.onClick(() => void this.remove())
 			);
 		}
