@@ -74,6 +74,8 @@ export class PropertyModal extends Modal {
 	private optionsText = "";
 	/** Whether this relation should become the schema's parent link. */
 	private asParentLink: boolean | null = null;
+	/** Whether this number should become the schema's manual-order field. */
+	private asOrderField: boolean | null = null;
 
 	constructor(
 		app: App,
@@ -186,6 +188,18 @@ export class PropertyModal extends Modal {
 		}
 
 		if (type === "number") {
+			new Setting(parent)
+				.setName("Use for manual ordering")
+				.setDesc(
+					"Lets you drag cards into an order within a board column. " +
+						"The position is stored in this property, so it is visible and editable like any other."
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.schema.orderProperty === this.draft.id)
+						.onChange((value) => (this.asOrderField = value))
+				);
+
 			new Setting(parent).setName("Format").addDropdown((dropdown) => {
 				dropdown.addOption("plain", "Plain");
 				dropdown.addOption("percent", "Percent");
@@ -377,6 +391,7 @@ export class PropertyModal extends Modal {
 
 		const draft = this.draft;
 		const asParent = this.asParentLink;
+		const asOrder = this.asOrderField;
 		await this.store.updateDatabase(this.schema.id, (schema) => {
 			const index = schema.properties.findIndex((p) => p.id === draft.id);
 			if (index === -1) schema.properties.push(draft);
@@ -385,6 +400,11 @@ export class PropertyModal extends Modal {
 			if (asParent === true) schema.parentProperty = draft.id;
 			else if (asParent === false && schema.parentProperty === draft.id) {
 				delete schema.parentProperty;
+			}
+
+			if (asOrder === true) schema.orderProperty = draft.id;
+			else if (asOrder === false && schema.orderProperty === draft.id) {
+				delete schema.orderProperty;
 			}
 		});
 
@@ -408,8 +428,9 @@ export class PropertyModal extends Modal {
 		const draft = this.draft;
 		await this.store.updateDatabase(this.schema.id, (schema) => {
 			schema.properties = schema.properties.filter((p) => p.id !== draft.id);
-			// A deleted relation cannot go on being the parent link.
+			// A deleted property cannot go on being the parent or order field.
 			if (schema.parentProperty === draft.id) delete schema.parentProperty;
+			if (schema.orderProperty === draft.id) delete schema.orderProperty;
 			// Drop rollups that followed a relation which no longer exists,
 			// rather than leaving them silently blank forever.
 			if (this.originalType === "relation") {

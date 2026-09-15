@@ -1333,3 +1333,59 @@ body.nfo-typography hr {
 .nfo-bulk-action:hover { background: var(--nfo-hover); color: var(--text-normal); }
 .nfo-bulk-action svg { width: 14px; height: 14px; }
 .nfo-bulk-danger:hover { color: var(--text-error, #d44); }
+
+/* --- Board columns: collapse, limits, sub-groups, reordering --------------- */
+
+.nfo-board-twisty {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	color: var(--nfo-muted);
+	opacity: 0.5;
+}
+
+.nfo-board-twisty:hover { opacity: 1; }
+.nfo-board-twisty svg { width: 14px; height: 14px; }
+
+.nfo-board-more {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	color: var(--nfo-muted);
+	opacity: 0;
+}
+
+.nfo-board-column:hover .nfo-board-more { opacity: 0.6; }
+.nfo-board-more:hover { opacity: 1; }
+.nfo-board-more svg { width: 14px; height: 14px; }
+
+/* A column over its limit reads as over at a glance. */
+.nfo-board-over {
+	color: var(--text-error, #d44);
+	font-weight: 700;
+}
+
+.nfo-board-collapsed { flex: 0 0 44px; padding: 8px 6px; }
+.nfo-board-collapsed .nfo-board-header { flex-direction: column; gap: 8px; }
+.nfo-board-collapsed .nfo-pill {
+	writing-mode: vertical-rl;
+	max-width: none;
+	max-height: 160px;
+}
+.nfo-board-collapsed .nfo-board-more { display: none; }
+
+.nfo-board-subgroup { margin-bottom: 10px; }
+
+.nfo-board-subhead {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 5px;
+	padding-left: 2px;
+	font-size: 0.85em;
+}
+
+/* Where a dragged card would land. */
+.nfo-card-drop-above { box-shadow: 0 -3px 0 -1px var(--interactive-accent); }
+.nfo-card-drop-below { box-shadow: 0 3px 0 -1px var(--interactive-accent); }
