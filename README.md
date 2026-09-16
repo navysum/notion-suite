@@ -1,8 +1,8 @@
 # Notion Suite
 
 Bring the parts of Notion you actually miss into Obsidian: the `/` menu, databases,
-table / board / gallery / list / calendar views, inline property editing, relations,
-rollups, and charts built from your own data.
+table / board / gallery / list / calendar / timeline views, inline property editing,
+sub-items, relations, rollups, and charts built from your own data.
 
 Everything stays plain markdown. There is no lock-in, no sync service, and no
 account. If you uninstall this plugin tomorrow, every note you made is still a
@@ -17,14 +17,19 @@ normal `.md` file you can open in any editor.
 3. [Your first database, step by step](#3-your-first-database-step-by-step)
 4. [The slash menu](#4-the-slash-menu)
 5. [Database views](#5-database-views)
-6. [Filtering and sorting](#6-filtering-and-sorting)
-7. [Property types, relations and rollups](#7-property-types-relations-and-rollups)
-8. [Charts](#8-charts)
-9. [Columns](#9-columns)
-10. [Coming from Notion](#10-coming-from-notion)
-11. [Settings](#11-settings)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Developing](#13-developing)
+6. [Getting around: the sidebar and full-page databases](#6-getting-around-the-sidebar-and-full-page-databases)
+7. [Filtering and sorting](#7-filtering-and-sorting)
+8. [Property types, relations and rollups](#8-property-types-relations-and-rollups)
+9. [Sub-items, unique IDs and bulk editing](#9-sub-items-unique-ids-and-bulk-editing)
+10. [Boards in depth](#10-boards-in-depth)
+11. [Charts](#11-charts)
+12. [Widgets](#12-widgets)
+13. [Page furniture: icons, covers, contents, breadcrumbs, columns](#13-page-furniture-icons-covers-contents-breadcrumbs-columns)
+14. [Coming from Notion](#14-coming-from-notion)
+15. [What this plugin touches](#15-what-this-plugin-touches)
+16. [Settings and commands](#16-settings-and-commands)
+17. [Troubleshooting](#17-troubleshooting)
+18. [Developing](#18-developing)
 
 ---
 
@@ -71,24 +76,29 @@ without the plugin. That is the escape hatch Notion never gave you.
 ## 2. Installing it
 
 > **Requires Obsidian 1.13.0 or later.** The settings tab uses the declarative
-> settings API, which is what puts your settings in Obsidian's search. If you
-> are on an older build, version 1.2.1 is functionally identical apart from
-> that.
+> settings API, which is what puts your settings into Obsidian's own search.
 
+### Option A — the community directory (recommended)
 
-### Option A — BRAT (recommended until the directory listing lands)
+Settings → Community plugins → **Browse** → search for **Notion Suite** → Install
+→ Enable.
 
-BRAT installs a plugin straight from a GitHub repository and keeps it updated,
-which is exactly what you want while this is pre-directory.
+Updates arrive through Obsidian itself from then on; there is nothing else to set up.
 
-1. In Obsidian, install **BRAT** from Settings → Community plugins → Browse.
+> If it doesn't appear in Browse, Obsidian is showing you a cached plugin list.
+> Close and reopen the Browse dialog, or restart Obsidian, and search again.
+
+### Option B — BRAT
+
+BRAT installs a plugin straight from a GitHub repository. Useful if you want
+releases the moment they are cut rather than when the directory catches up.
+
+1. Install **BRAT** from Settings → Community plugins → Browse.
 2. Run the command **BRAT: Plugins: Add a beta plugin for testing**.
 3. Paste `https://github.com/navysum/notion-suite`, choose **Latest version**,
    and tick "enable after installing".
 
-That's it. BRAT will pull each new release automatically from then on.
-
-### Option B — build it yourself
+### Option C — build it yourself
 
 You need [Node.js](https://nodejs.org).
 
@@ -107,20 +117,17 @@ That produces `main.js`. Copy `main.js`, `manifest.json` and `styles.css` into:
 
 Create that folder if it doesn't exist. (On macOS press `Cmd+Shift+.` in Finder
 to reveal hidden folders; on Windows tick "Hidden items" in File Explorer's View
-tab.) Then in Obsidian go to Settings → Community plugins, turn off restricted
-mode if it's on, hit the reload icon, and toggle **Notion Suite** on.
+tab.) Then in Obsidian go to Settings → Community plugins, hit the reload icon,
+and toggle **Notion Suite** on.
 
 `main.js` is deliberately **not** committed to this repository — it is a build
 artifact, published as a release asset. The community directory verifies that a
 release was genuinely built from the committed source, and a stale checked-in
 bundle is what that check exists to catch.
 
-### Option C — the community directory
-
-Once listed, this will be installable from Settings → Community plugins →
-Browse, with updates handled by Obsidian itself.
-
 You should now see a database icon in the left ribbon.
+
+---
 
 ## 3. Your first database, step by step
 
@@ -160,6 +167,8 @@ You now have a working kanban board. Try these:
 - **Click the "Board" button** in the toolbar and switch to Table. Now you can click
   any cell and edit it in place.
 - **Type in the search box.** It filters across the title and every property.
+- **Click a row.** It opens beside the view rather than over it — Notion's "side peek",
+  so you don't lose the board you were working in.
 
 **Step 6.** Add a second view of the *same* data. Type `/database` again, pick
 **Database — view**, choose Tasks, and choose Calendar.
@@ -178,17 +187,19 @@ The `/` only triggers at the start of a line or after a space, so URLs (`https:/
 dates (`2026/03/14`) and phrases like `and/or` are left alone.
 
 **Basic blocks** — Text, Heading 1/2/3, Bulleted list, Numbered list, To-do list,
-Toggle list, Quote, Divider, Code, Table, Columns
+Toggle list, **Toggle heading 1/2/3**, Quote, Divider, Code, Table, Columns
+
+**Page structure** — Table of contents, Breadcrumb, Page icon and cover
 
 **Callouts** — Callout, Tip, Warning, Danger, Success, Question
 
-**Databases** — Database (new), Database view, Add item, Chart from database
+**Databases** — Database (new), Database view, Add item, Chart from database, Widget
 
 **Inline** — Date (today), Date (tomorrow), Link to page, Embed page, Equation, Highlight
 
 You don't have to type the exact name. Every command has aliases, so `/kanban` finds the
-database view, `/graph` finds the chart, `/collapse` finds the toggle, and `/checkbox`
-finds the to-do.
+database view, `/graph` finds the chart, `/collapse` finds the toggle, `/checkbox`
+finds the to-do, and `/banner` finds the page icon and cover.
 
 Want a different trigger character? Settings → Notion Suite → Trigger character.
 
@@ -196,13 +207,34 @@ Want a different trigger character? Settings → Notion Suite → Trigger charac
 
 ## 5. Database views
 
-**You never have to write this by hand either.** `/database` → **Database view**
-opens a dialog for every setting. On any rendered view, the toolbar has a
-**⚙ Settings** button that reopens it, pre-filled.
+**You never have to write this by hand.** `/database` → **Database view** opens a
+dialog for every setting. On any rendered view, the toolbar has a **⚙ Settings**
+button that reopens it, pre-filled.
 
 Switching view type is even quicker: click the view-type button in the toolbar
 (**Table**, **Board**, …) and pick another. That choice is saved into the note,
 so it sticks — it isn't just a preview.
+
+### The six views
+
+**Table** — a spreadsheet. Click any cell to edit it. Click a column header to sort,
+hide it, or set a **footer calculation** (sum, average, percent checked…). Rows with
+sub-items get a twisty to fold them away.
+
+**Board** — kanban. Drag cards between columns to change the grouping property. Empty
+columns still show, so you can drag into them. See [Boards in depth](#10-boards-in-depth).
+
+**Gallery** — cards with cover images. Good for a reading list, recipes, or anything
+visual.
+
+**List** — a compact line per row. If the database has a checkbox property, it becomes a
+tickable to-do list.
+
+**Calendar** — a month grid. Hover a day and press `+` to create a row already dated to
+that day. Arrows move between months.
+
+**Timeline** — a Gantt-style chart. Each row becomes a bar between a start and an end
+date. Scale it by day, week or month.
 
 <details>
 <summary>The underlying syntax, if you ever want to read or hand-edit it</summary>
@@ -217,44 +249,53 @@ group: status
 ```
 ````
 
-### Every option
-
 | Key | What it does | Example |
 | --- | --- | --- |
 | `database` | Which database to show. Required. | `database: Tasks` |
-| `view` | `table`, `board`, `gallery`, `list` or `calendar`. Defaults to `table`. | `view: board` |
-| `group` | Board columns. Needs a select, multi-select or checkbox property. | `group: status` |
+| `view` | `table`, `board`, `gallery`, `list`, `calendar` or `timeline`. Defaults to `table`. | `view: board` |
+| `title` | A heading for this view. | `title: This week` |
+| `group` | Board columns. Needs a select, status, multi-select or checkbox property. | `group: status` |
+| `subgroup` | A second grouping that splits each board column. | `subgroup: priority` |
+| `collapsed` | Board columns that start folded. | `collapsed: [Done]` |
+| `limits` | Per-column card limits (WIP limits). | `limits: {Doing: 3}` |
+| `limit_mode` | `soft` (default), `ask` or `strict` — what a limit does on a drop. | `limit_mode: ask` |
+| `buckets` | Bucket a date grouping into overdue / today / this week / later. | `buckets: true` |
 | `date` | Which date property the calendar uses. | `date: due` |
+| `start` / `end` | The properties bounding each timeline bar. | `start: begins` |
+| `scale` | Timeline scale: `day`, `week` or `month`. | `scale: week` |
 | `cover` | Which property holds the card image (gallery/board). | `cover: cover` |
+| `size` | Gallery card size: `small`, `medium`, `large`. | `size: large` |
 | `properties` | Which properties to show, in this order. | `properties: [status, due]` |
+| `hide` | Properties to hide **in this view only**. | `hide: [notes]` |
+| `calculate` | Table footer calculations, per property. | `calculate: {hours: sum}` |
 | `filter` | Which rows to show. See below. | `filter: [Status is not Done]` |
 | `sort` | Row order. | `sort: due asc` |
 | `limit` | Show at most this many rows. | `limit: 10` |
-| `size` | Gallery card size: `small`, `medium`, `large`. | `size: large` |
-| `title` | A heading for this view. | `title: This week` |
 
 </details>
 
-### The five views
+---
 
-**Table** — a spreadsheet. Click any cell to edit it. Click a column header to sort or
-hide it.
+## 6. Getting around: the sidebar and full-page databases
 
-**Board** — kanban. Drag cards between columns to change the grouping property. Empty
-columns still show, so you can drag into them.
+Two views of a database are useful. Fifteen are a filing problem, which is why
+Notion puts databases in a sidebar rather than only inside pages.
 
-**Gallery** — cards with cover images. Good for a reading list, recipes, or anything
-visual.
+**The sidebar.** Click the database icon in the left ribbon, or run **Notion: Show
+the databases sidebar**. Every database in the vault is listed with a live row
+count. Click one to open it.
 
-**List** — a compact line per row. If the database has a checkbox property, it becomes a
-tickable to-do list.
+**Full-page databases.** A database opened from the sidebar fills a whole tab,
+with no host note around it — the same views, the same toolbar, the same editing,
+just not embedded in anything. Run **Notion: Open a database** to jump straight to
+one.
 
-**Calendar** — a month grid. Hover a day and press `+` to create a row already dated to
-that day. Arrows move between months.
+Use inline blocks when a view belongs to a note ("this project's tasks"), and the
+sidebar when the database *is* the thing you're working in.
 
 ---
 
-## 6. Filtering and sorting
+## 7. Filtering and sorting
 
 Filters are written the way you'd say them out loud — in the settings dialog's
 **Filter** box, one per line. This is the one place you do type something, and
@@ -284,6 +325,14 @@ filter:
 ```
 ````
 
+You can also write a group inline, and nest up to three levels deep:
+
+```
+filter:
+  - Priority >= 3
+  - (Status is Doing or Owner is me)
+```
+
 **Operators you can use:**
 
 `is` · `is not` · `contains` · `does not contain` · `starts with` · `ends with` ·
@@ -307,13 +356,14 @@ sort:
 
 ---
 
-## 7. Property types, relations and rollups
+## 8. Property types, relations and rollups
 
 | Type | Stored as | Editing |
 | --- | --- | --- |
 | `text` | a string | click to type |
 | `number` | a number | click to type; formats as plain, percent or currency |
 | `select` | a string | click for a menu of options |
+| `status` | a string | like select, but options are bucketed into To-do / In progress / Done |
 | `multiselect` | a list | click to tick several |
 | `date` | `YYYY-MM-DD` | click for a date picker |
 | `checkbox` | `true` / `false` | click the box |
@@ -323,6 +373,7 @@ sort:
 | `relation` | a list of note titles | click to link rows in another database |
 | `rollup` | computed | read-only, see below |
 | `formula` | computed | read-only, see below |
+| `uniqueid` | a number, with an optional prefix | assigned once, never reused |
 | `created` / `updated` | from the file itself | read-only |
 
 ### Relations and rollups
@@ -379,6 +430,9 @@ completion percentage per project, computed from the task notes themselves.
 | Dates | `Earliest date`, `Latest date`, `Date range (days)` |
 | Checkboxes | `Checked`, `Unchecked`, `Percent checked`, `Percent unchecked` |
 
+The same list powers **table footer calculations** — click a column header and pick
+one to get a total under the column.
+
 Two distinctions that trip people up:
 
 - **`Count all` vs `Count values`** — `Count all` counts related *rows*. `Count
@@ -423,7 +477,60 @@ as `0`. Division by zero gives an empty cell rather than an error.
 
 ---
 
-## 8. Charts
+## 9. Sub-items, unique IDs and bulk editing
+
+### Sub-items
+
+A row can be nested under another row. Add a property to hold the parent's title (**Properties → New property…**,
+type **Text** or **Relation**), and turn on **Use as the parent link** in that
+same dialog. Rows that name a parent appear indented underneath it, with a
+twisty to fold them away.
+
+Because the link is an ordinary property holding a title, the hierarchy is
+visible and editable in the note itself — not hidden in plugin state.
+
+Deleting a parent asks what to do with anything nested under it: take them too,
+or leave them (they become top-level rows). Dismissing that dialog cancels the
+delete outright.
+
+### Unique IDs
+
+Add a property of type **Unique ID** and every row gets a number that is assigned
+once and never reused, optionally with a prefix — `TASK-1`, `TASK-2`. Deleting a
+row does not free its number, which is the point: an ID you can quote in a
+conversation has to keep meaning the same thing.
+
+Already have rows? Run **Notion: Assign unique IDs to existing rows**.
+
+### Bulk editing
+
+Tick the box beside several rows in a table and a bar appears. It sets one
+property across every ticked row at once — the fastest way to re-triage a
+backlog.
+
+---
+
+## 10. Boards in depth
+
+Boards are where most of Notion's day-to-day feel lives, so they carry the most
+options. All of them are in the ⚙ Settings dialog.
+
+- **Sub-grouping.** Split every column by a second property, so a Status board
+  reads Priority-first inside each column.
+- **Collapsible columns.** Fold a column you aren't working in. The state is
+  saved into the block, so it stays folded.
+- **WIP limits.** Give a column a card limit. What a limit *means* is yours to
+  choose: `soft` colours the count and lets the drop through (the default — a
+  limit is a signal, not a rule), `ask` confirms first, `strict` refuses.
+- **Manual ordering.** Drag a card within its column to reorder it. The first
+  time you do, the plugin offers to store positions in a hidden property; say no
+  and it won't ask again that session.
+- **Date buckets.** Group by a date property and the columns become **Overdue /
+  Today / This week / Later** rather than one column per date.
+
+---
+
+## 11. Charts
 
 This is the piece Notion charges for.
 
@@ -520,7 +627,62 @@ is unreadable.
 
 ---
 
-## 9. Columns
+## 12. Widgets
+
+A chart answers "how is this distributed?". A widget answers "what's the one
+number?" — the small, glanceable things a Notion dashboard is made of. Type
+`/widget` and pick a kind.
+
+| Kind | Shows |
+| --- | --- |
+| `metric` | A single figure: a count, a sum, an average, a percentage |
+| `progress` | A bar: how much of a filtered set is done |
+| `countdown` | Days until the next date in a property |
+| `list` | The top few rows, as links |
+| `button` | A button that adds a row with values already filled in |
+
+````markdown
+```notion-widget
+kind: metric
+database: Tasks
+aggregate: count
+filter: [Status is not Done]
+label: Still open
+```
+````
+
+Every kind takes `database`, `filter` and `label`; `metric` adds `aggregate`,
+`value`, `prefix` and `suffix`; `progress` adds a `total` filter to divide by;
+`countdown` takes a `date` property or a literal `target`; `list` takes a `limit`.
+
+---
+
+## 13. Page furniture: icons, covers, contents, breadcrumbs, columns
+
+### Icons and covers
+
+Run **Notion: Set this note's icon and cover** (or `/cover`). Pick an emoji and a
+cover image, and they appear above the note's title the way a Notion page header
+does. Both are stored in the note's own frontmatter.
+
+Turn the whole feature off, or change the cover height, in Settings.
+
+### Table of contents and breadcrumbs
+
+````markdown
+```notion-toc
+```
+````
+
+Builds a live list of the note's headings. `notion-breadcrumb` does the same for
+the note's folder path, as clickable links.
+
+### Toggle headings
+
+A heading that folds the section underneath it — `/toggle heading 1`. Notion's
+single most-used organising device, and markdown has no equivalent.
+
+### Columns
 
 Markdown has no side-by-side syntax, so this adds one. Separate the columns with a line
 containing `===`:
@@ -542,7 +704,7 @@ work inside one. Columns collapse to a single stack on narrow screens.
 
 ---
 
-## 10. Coming from Notion
+## 14. Coming from Notion
 
 **Export from Notion** as Markdown & CSV. You'll get a folder per database, with one
 `.md` file per row and the properties already in frontmatter — exactly the shape this
@@ -555,7 +717,7 @@ it finds, and collects the distinct values of select properties into options.
 Then drop a view block into any note and you're running.
 
 **What carries over well:** properties, select options, dates, checkboxes, relations by
-title, page content, and nested pages.
+title, sub-items, page content, and nested pages.
 
 **What differs, honestly:**
 
@@ -564,14 +726,15 @@ title, page content, and nested pages.
   [Relations and rollups](#relations-and-rollups).
 - **Permissions, comments and sharing** are Notion-server features with no local
   equivalent.
-- **Sub-items and dependencies** aren't modelled as first-class features.
+- **Dependencies** between rows aren't modelled. Sub-items are.
 - **The block-level drag handle** isn't reproduced; Obsidian's editor is text-first.
+- **Synced blocks** have no equivalent. Embedding a note (`/embed`) is the nearest thing.
 
 Everything else in this README works today.
 
 ---
 
-## 10b. What this plugin touches
+## 15. What this plugin touches
 
 Worth stating plainly, since the community directory publishes a behaviour
 report for every listed plugin:
@@ -581,40 +744,55 @@ report for every listed plugin:
 - **The network: never.** No telemetry, no accounts, no remote calls, no
   external assets. Charts are drawn locally as SVG, with no charting library.
 - **Your clipboard: never.** Nothing is read from or written to it.
+- **Code execution: never.** The formula engine is a hand-written parser, not
+  `eval` — a build-failing test enforces that.
 
 You do not have to take that on trust. The directory's review reports no
 suspicious network patterns, no obfuscation, and reproduces the released
 `main.js` byte-for-byte from this repository — so the code you can read here is
 provably the code you are running.
 
-## 11. Settings
+---
+
+## 16. Settings and commands
+
+### Settings
 
 - **Slash command menu** — turn the `/` menu on or off.
 - **Trigger character** — use something other than `/`.
+- **Page icons and covers** — show them above the note title, and set the cover height.
 - **Notion typography** — Notion-like heading sizes, line spacing and callout styling.
 - **Default folder** — where new databases get created. Default `Databases`.
+- **Show the databases sidebar on startup**.
+- **Open rows beside the view** — the side peek. Turn it off to open rows in place.
 - **Compact rows** — tighter rows in table and list views.
 - **Import an existing folder** — turn any folder of notes into a database.
 - **Your databases** — copy a view block for any database, or remove a database
   definition. Removing only forgets the schema; **your notes are never deleted**.
 
-## Releasing (for maintainers)
+### Commands
 
-Publishing is driven by the version in `manifest.json`, not by tags:
+Bind any of these to a key in Settings → Hotkeys.
 
-```bash
-npm version patch   # or minor / major
-git push
-```
-
-`npm version` bumps `manifest.json` and `versions.json`, and the push triggers a
-workflow that typechecks, tests, builds, attests the build and publishes a
-GitHub release whose tag matches the manifest version — which is what Obsidian's
-updater reads. A push that does not change the version releases nothing.
+| Command | What it does |
+| --- | --- |
+| Show the databases sidebar | Opens the sidebar |
+| Open a database | Jumps to a full-page database |
+| New database | The create dialog |
+| Insert database view | A view block in the current note |
+| Insert chart from database | A chart block |
+| Add item to a database | A new row, without leaving the note |
+| Add a property to a database | The property dialog |
+| Turn a folder into a database | Import |
+| Set this note's icon and cover | The page header dialog |
+| Toggle the checkbox property on the active row | Tick a to-do from inside the note |
+| Assign unique IDs to existing rows | Backfills a Unique ID property |
+| Toggle the slash menu | On/off without opening settings |
+| Refresh all database views | When something looks stale |
 
 ---
 
-## 12. Troubleshooting
+## 17. Troubleshooting
 
 **"No database called X"** — the name in `database:` must match the database name in
 settings, not the folder name. Settings → Notion Suite lists them, and each has a
@@ -624,8 +802,8 @@ settings, not the folder name. Settings → Notion Suite lists them, and each ha
 outside the block; Obsidian renders code blocks in reading mode and in live preview when
 the cursor is elsewhere.
 
-**A board says it needs a group property** — boards group by a `select`, `multiselect` or
-`checkbox` property. Add one, then set `group: <property>`.
+**A board says it needs a group property** — boards group by a `select`, `status`,
+`multiselect` or `checkbox` property. Add one, then set `group: <property>`.
 
 **A property isn't showing** — check the `id` matches the frontmatter key exactly
 (case-sensitive). The key in the note is what's read; the property's `name` is only a
@@ -637,15 +815,19 @@ Views normally update themselves when files change.
 **Edits aren't saving** — the note is probably open in another pane with unsaved changes.
 Close the duplicate pane.
 
+**It's not in Browse** — Obsidian caches the plugin list. Close and reopen the
+Browse dialog, or restart Obsidian.
+
 ---
 
-## 13. Developing
+## 18. Developing
 
 ```bash
 npm install
 npm run dev        # rebuild on save
 npm run build      # typecheck, then a production bundle
-npm test           # run the logic test suite
+npm test           # the full test suite
+npm run lint       # eslint, including eslint-plugin-obsidianmd
 npm run typecheck  # types only
 ```
 
@@ -653,6 +835,10 @@ For live development, symlink the project folder into
 `<vault>/.obsidian/plugins/notion-suite` so `npm run dev` rebuilds straight into
 your vault. The [Hot Reload plugin](https://github.com/pjeby/hot-reload) will then pick
 up each rebuild without restarting Obsidian.
+
+**Before you change anything, read [CONTRIBUTING.md](CONTRIBUTING.md).** It is not
+style advice: every rule in it exists because the same bug shipped more than once,
+and each is backed by a check that fails the build.
 
 ### How the code is laid out
 
@@ -663,35 +849,86 @@ src/
   settings.ts        settings tab
   db/
     store.ts         schemas; folder-of-notes <-> rows; all frontmatter writes
-    query.ts         filtering, sorting, grouping
-    value.ts         property coercion, formatting, comparison, formulas
+    query.ts         filtering, sorting, grouping, date buckets
+    value.ts         property coercion, formatting, comparison
+    formula.ts       the formula language: tokenizer, parser, evaluator
     rollup.ts        gathering related values and collapsing them
     resolve.ts       rollup/formula resolution, with cycle protection
+    calculate.ts     table footer calculations
+    tree.ts          sub-items: building and walking the hierarchy
+    order.ts         manual ordering positions
   views/
     renderer.ts      toolbar, search, dispatch to a view
-    table.ts board.ts gallery.ts list.ts calendar.ts
+    viewState.ts     per-view state that has to survive a re-render
+    table.ts board.ts gallery.ts list.ts calendar.ts timeline.ts
     cells.ts         the editable cell widgets
     config.ts        parses ```notion-db and ```notion-chart blocks
+    blockEdit.ts     writing settings back into a note's code block
+    sidebar.ts       the databases sidebar
+    databaseView.ts  full-page databases
+    pageBlocks.ts    table of contents and breadcrumbs
     columns.ts       the ```notion-columns block
   charts/
     aggregate.ts     rows -> chart data
     svg.ts           chart data -> inline SVG
+  widgets/
+    widget.ts        parsing ```notion-widget blocks
+    render.ts        drawing them
   slash/
     commands.ts      the command catalogue and its matching
     suggest.ts       the / menu itself
   ui/
     modals.ts        create database, insert view, insert chart, import folder
     propertyModal.ts create/edit/delete a property, including rollups
+    confirmModal.ts  confirm() and choose() dialogs
+    bulkModal.ts     setting one property across many rows
+    pageBanner.ts    page icons and covers
     templates.ts     the nine starter databases
-tests/
-  logic.test.ts      the query, chart, config and value engines
-  rollup.test.ts     rollup aggregation, relation matching, cycle safety
 ```
 
-The tests cover the parts that don't need a running Obsidian: value coercion, the filter
-and sort engine, grouping, chart aggregation, block config parsing, formulas, rollups and
-date handling. `tests/obsidian-stub.ts` stands in for the Obsidian API so they run in
-plain Node.
+### Tests
+
+```
+tests/
+  logic.test.ts      query, chart, config and value engines
+  rollup.test.ts     rollup aggregation, relation matching, cycle safety
+  formula.test.ts    the formula language
+  widget.test.ts     widget parsing and rendering
+  roundtrip.test.ts  anything rendered to text and read back must survive it
+  guards.test.ts     build-failing checks for mistakes this repo has made
+  view.test.ts       views rendered into a real DOM and driven like a user
+  interact.test.ts   dialogs, panes and drag-and-drop
+  dom.ts             a DOM plus Obsidian's element helpers
+  obsidian-stub.ts   a stand-in for the Obsidian API
+```
+
+`tests/dom.ts` gives the suite a real document and the helper methods Obsidian
+adds to `HTMLElement`, so the plugin's actual renderers run in CI: a test can
+type into the search box, press "next month", drop a card or dismiss a dialog and
+then check what the user would be looking at. Every one of those tests was
+written by reintroducing the original bug and watching it fail.
+
+The harness is a *model* of Obsidian, though, and a wrong model passes its own
+tests. What turns on Obsidian's real semantics — a real drag gesture, when a
+post-processor re-runs — plus anything visual stays in
+[docs/SMOKE.md](docs/SMOKE.md), which is the short manual checklist to walk
+before a release that touches views or panes.
+
+### Releasing
+
+Publishing is driven by the version in `manifest.json`, not by tags:
+
+```bash
+npm version patch   # or minor / major
+git push
+```
+
+`npm version` bumps `manifest.json` and `versions.json`, and the push triggers a
+workflow that typechecks, lints, tests, builds, attests the build and publishes a
+GitHub release whose tag matches the manifest version — which is what Obsidian's
+updater reads. A push that does not change the version releases nothing.
+
+---
 
 ## License
 
