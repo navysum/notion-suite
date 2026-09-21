@@ -33,6 +33,7 @@ import { DATABASE_VIEW_TYPE, DatabaseItemView, openDatabaseTab } from "./views/d
 import { SIDEBAR_VIEW_TYPE, DatabaseSidebarView } from "./views/sidebar";
 import { renderBreadcrumb, renderTableOfContents } from "./views/pageBlocks";
 import { registerBanners } from "./ui/pageBanner";
+import { registerPropertyPanel } from "./ui/propertyPanel";
 import { PageStyleModal } from "./ui/pageStyleModal";
 import { runDetached } from "./utils/async";
 
@@ -84,6 +85,10 @@ export default class NotionForObsidian extends Plugin {
 			(leaf) => new DatabaseItemView(leaf, this)
 		);
 		this.registerView(SIDEBAR_VIEW_TYPE, (leaf) => new DatabaseSidebarView(leaf, this));
+
+		registerPropertyPanel(this, this.store, () => ({
+			showPropertyPanel: this.settings.showPropertyPanel,
+		}));
 
 		registerBanners(this, () => ({
 			showBanners: this.settings.showBanners,

@@ -156,6 +156,29 @@ export function installDom(): void {
 		this.style.display = "none";
 	};
 
+	// Obsidian also exposes these as globals, not only as element methods --
+	// the page banner and the property panel both build detached elements with
+	// them before deciding where to insert them.
+	const doc = (window as unknown as { document: Document }).document;
+	g.createEl = (tag: string, info?: DomInfo | string, cb?: (el: HTMLElement) => void) => {
+		const el = doc.createElement(tag) as HTMLElement;
+		apply(el, info);
+		cb?.(el);
+		return el;
+	};
+	g.createDiv = (info?: DomInfo | string, cb?: (el: HTMLElement) => void) =>
+		(g.createEl as (t: string, i?: DomInfo | string, c?: (el: HTMLElement) => void) => HTMLElement)(
+			"div",
+			info,
+			cb
+		);
+	g.createSpan = (info?: DomInfo | string, cb?: (el: HTMLElement) => void) =>
+		(g.createEl as (t: string, i?: DomInfo | string, c?: (el: HTMLElement) => void) => HTMLElement)(
+			"span",
+			info,
+			cb
+		);
+
 	proto.setCssStyles = function (this: HTMLElement, styles: Record<string, string>): void {
 		for (const [key, value] of Object.entries(styles)) {
 			this.style.setProperty(key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`), value);
