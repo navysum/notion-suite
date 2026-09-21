@@ -1,7 +1,10 @@
-import { Menu, setIcon } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig, ViewType } from "../types";
 import { queryRows } from "../db/query";
 import { runWrite, ViewContext } from "./context";
+import { runDetached } from "../utils/async";
+import { makeId } from "../db/store";
+import { SaveViewModal } from "../ui/saveViewModal";
 import { renderTable, createInlineRow, iconForType } from "./table";
 import { renderBoard } from "./board";
 import { renderGallery } from "./gallery";
@@ -129,6 +132,28 @@ function renderMore(
 	});
 }
 
+
+/**
+ * Write the rows this view is showing to a CSV beside the note.
+ *
+ * The view's own filter and sort decide what goes in: exporting "everything in
+ * the database" from a view that visibly shows eleven rows would be a surprise,
+ * and the sidebar's whole-database export is a click away for when that is what
+ * you want.
+ */
+async function exportView(ctx: ViewContext, view: ViewConfig): Promise<void> {
+	const properties = visibleProperties(ctx, view);
+	const rows = queryRows(
+		ctx.schema,
+		ctx.store.rows(ctx.schema),
+		view.filter,
+		view.sorts,
+		view.pageSize
+	);
+	const path = await ctx.store.writeCsv(ctx.schema, rows, properties, ctx.sourcePath);
+	new Notice(`Exported ${rows.length} ${rows.length === 1 ? "row" : "rows"} to ${path}`);
+}
+
 /**
  * Resolve which properties this view shows.
  *
@@ -211,6 +236,39 @@ function renderToolbar(
 					})
 			);
 		}
+		menu.showAtMouseEvent(evt);
+	});
+
+	const moreBtn = actions.createDiv({ cls: "nfo-toolbar-btn" });
+	setIcon(moreBtn.createSpan(), "more-horizontal");
+	moreBtn.setAttribute("aria-label", "More");
+	moreBtn.addEventListener("click", (evt) => {
+		const menu = new Menu();
+		menu.addItem((item) =>
+			item
+				.setTitle("Save this view…")
+				.setIcon("bookmark")
+				.onClick(() => {
+					new SaveViewModal(ctx.app, ctx.schema, view, (name) => {
+						runWrite(
+							ctx,
+							"save that view",
+							ctx.store.updateDatabase(ctx.schema.id, (schema) => {
+								const saved: ViewConfig = { ...view, id: makeId("view"), name };
+								schema.views = [...schema.views.filter((v) => v.name !== name), saved];
+							})
+						);
+					}).open();
+				})
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle("Export to CSV")
+				.setIcon("download")
+				.onClick(() => {
+					runDetached("export that view", () => exportView(ctx, view));
+				})
+		);
 		menu.showAtMouseEvent(evt);
 	});
 

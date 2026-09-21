@@ -1,6 +1,8 @@
-import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, WorkspaceLeaf, setIcon } from "obsidian";
 import type NotionForObsidian from "../main";
 import { databaseContextMenu, openDatabaseTab } from "./databaseView";
+import { viewIcon } from "./renderer";
+import { runDetached } from "../utils/async";
 import { queryRows } from "../db/query";
 
 export const SIDEBAR_VIEW_TYPE = "notion-suite-sidebar";
@@ -85,6 +87,41 @@ export class DatabaseSidebarView extends ItemView {
 			item.addEventListener("contextmenu", (evt) =>
 				databaseContextMenu(evt, this.plugin, schema)
 			);
+
+			// Saved views hang under their database. A view is a block of
+			// settings -- a filter, a sort, which properties, which type -- and
+			// rebuilding "this week's work" every time is what these exist to
+			// stop.
+			const saved = schema.views.filter((view) => view.name);
+			for (const view of saved) {
+				const child = list.createDiv({ cls: "nfo-sidebar-item nfo-sidebar-view" });
+				const glyph = child.createSpan({ cls: "nfo-sidebar-icon" });
+				setIcon(glyph, viewIcon(view.type));
+				child.createDiv({ cls: "nfo-sidebar-text" }).createDiv({
+					cls: "nfo-sidebar-name",
+					text: view.name,
+				});
+				child.addEventListener("click", () => {
+					void openDatabaseTab(this.plugin, schema, view.type, view.id);
+				});
+				child.addEventListener("contextmenu", (evt) => {
+					evt.preventDefault();
+					const menu = new Menu();
+					menu.addItem((entry) =>
+						entry
+							.setTitle("Forget this view")
+							.setIcon("trash")
+							.onClick(() => {
+								runDetached("forget that view", () =>
+									this.plugin.store.updateDatabase(schema.id, (target) => {
+										target.views = target.views.filter((v) => v.id !== view.id);
+									})
+								);
+							})
+					);
+					menu.showAtMouseEvent(evt);
+				});
+			}
 		}
 	}
 }
