@@ -7,6 +7,7 @@ import {
 } from "../types";
 import { isEmpty } from "./value";
 import { parseDate, toISODate } from "../utils/dates";
+import { linkTarget } from "../utils/text";
 
 /**
  * Rollups: follow a relation, gather one property off every related row, then
@@ -48,12 +49,7 @@ export function relatedRows(
 	const seen = new Set<string>();
 	for (const raw of names) {
 		// Accept `[[Note]]`, `[[Note|alias]]` and a bare title alike.
-		const name = raw
-			.replace(/^!?\[\[/, "")
-			.replace(/\]\]$/, "")
-			.split("|")[0]
-			.split("#")[0]
-			.trim();
+		const name = linkTarget(raw);
 		if (!name) continue;
 		const row = index.get(name.toLowerCase());
 		// The same note listed twice is one relation, not two, so a sum over it

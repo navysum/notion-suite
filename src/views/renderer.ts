@@ -1,7 +1,7 @@
 import { Menu, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig, ViewType } from "../types";
 import { queryRows } from "../db/query";
-import { ViewContext } from "./context";
+import { runWrite, ViewContext } from "./context";
 import { renderTable, createInlineRow, iconForType } from "./table";
 import { renderBoard } from "./board";
 import { renderGallery } from "./gallery";
@@ -238,12 +238,14 @@ function renderToolbar(
 							ctx.persistKey("hide", `[${[...next].join(", ")}]`);
 							return;
 						}
-						void ctx.store
-							.updateDatabase(ctx.schema.id, (schema) => {
+						runWrite(
+							ctx,
+							"hide that property",
+							ctx.store.updateDatabase(ctx.schema.id, (schema) => {
 								const target = schema.properties.find((p) => p.id === prop.id);
 								if (target) target.hidden = !target.hidden;
 							})
-							.then(() => ctx.refresh());
+						);
 					})
 			);
 		}

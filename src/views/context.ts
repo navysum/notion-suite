@@ -1,4 +1,4 @@
-import { App, Menu } from "obsidian";
+import { App, Menu, Notice } from "obsidian";
 import { DatabaseStore } from "../db/store";
 import { DatabaseSchema } from "../types";
 import { SaveTemplateModal } from "../ui/templateModal";
@@ -26,6 +26,31 @@ export interface ViewContext {
 	collapsed?: Set<string>;
 	/** Rows ticked for a bulk edit, by path. Mutated in place. */
 	selected?: Set<string>;
+}
+
+
+/**
+ * Run a write and re-render, saying so if it fails.
+ *
+ * A view cannot await -- a click handler returns immediately -- so every write
+ * the UI performs runs detached. Detached used to mean silent: if the note was
+ * read-only, had been deleted since the view drew it, or the vault was mid-sync
+ * on a conflicted file, the promise rejected into nowhere. The cell simply
+ * showed its old value again, as though the click had never happened, and the
+ * only trace was an unhandled rejection in a console nobody had open.
+ *
+ * Failures now say what did not happen. The view is redrawn either way, so what
+ * is on screen is what is on disk.
+ */
+export function runWrite(ctx: ViewContext, what: string, work: Promise<unknown>): void {
+	work.then(
+		() => ctx.refresh(),
+		(error: unknown) => {
+			console.error(`Notion Suite: ${what} failed`, error);
+			new Notice(`Could not ${what}. Your note was not changed.`);
+			ctx.refresh();
+		}
+	);
 }
 
 /**

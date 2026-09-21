@@ -470,10 +470,30 @@ Reference other properties in `{braces}` and use `+ - * / ( )`:
 {Hours} * 85
 ```
 
-This is deliberately a small language. It does arithmetic and nothing else — it cannot
-run code, which is why it's safe to have it evaluate automatically on every render.
-Checkboxes count as `1` and `0`, and a reference to a property that doesn't exist counts
-as `0`. Division by zero gives an empty cell rather than an error.
+There's a good deal more than arithmetic:
+
+| Group | Functions |
+| --- | --- |
+| Logic | `if(test, then, else)`, `switch(value, case, result, …, fallback)`, `empty(x)`, `notEmpty(x)` |
+| Numbers | `round`, `floor`, `ceil`, `abs`, `min`, `max`, `toNumber` |
+| Text | `length`, `lower`, `upper`, `slice`, `contains`, `replaceAll`, `format` |
+| Dates | `today()`, `now()`, `dateAdd`, `dateSubtract`, `dateBetween`, `formatDate` |
+| Bindings | `let name = …`, `const`, so a long formula can name its parts |
+
+```
+if({Done}, "✓", if(dateBetween({Due}, today(), "days") < 0, "Overdue", "On track"))
+let rate = 85; {Hours} * rate
+formatDate({Due}, "ddd") 
+```
+
+`replaceAll` takes a literal string, **not** a regular expression — `replaceAll(s, ".", "-")`
+replaces full stops, not every character. Notion's version takes a regex; this one
+deliberately doesn't, so your own text is never accidentally a pattern.
+
+What it cannot do is run code. There's no `eval` anywhere near it — it's a hand-written
+tokenizer and parser, which is why it's safe to evaluate automatically on every render.
+Checkboxes count as `1` and `0`, a reference to a property that doesn't exist counts as
+`0`, and division by zero gives an empty cell rather than an error.
 
 ---
 
@@ -721,9 +741,9 @@ title, sub-items, page content, and nested pages.
 
 **What differs, honestly:**
 
-- **Formulas** are arithmetic only. Notion's `if()`, `dateBetween()` and string functions
-  aren't here. Rollups, though, are fully supported — see
-  [Relations and rollups](#relations-and-rollups).
+- **Formulas** cover logic, text, numbers and dates — `if`, `switch`, `dateBetween`,
+  `formatDate` and the rest — but not Notion's full library, and `replaceAll` is
+  literal rather than a regex. See [Formulas](#formulas).
 - **Permissions, comments and sharing** are Notion-server features with no local
   equivalent.
 - **Dependencies** between rows aren't modelled. Sub-items are.
@@ -741,11 +761,17 @@ report for every listed plugin:
 
 - **Your vault files.** It creates and edits notes in your database folders, and
   writes property values into their frontmatter. That is the entire point of it.
-- **The network: never.** No telemetry, no accounts, no remote calls, no
-  external assets. Charts are drawn locally as SVG, with no charting library.
+- **The network: only if you ask.** No telemetry, no accounts, no remote calls.
+  Charts are drawn locally as SVG, with no charting library, and nothing is
+  loaded from a CDN. The **one** exception is a page cover set to an `http(s)`
+  address — common in Notion exports — which has to be fetched from that server
+  to be shown, telling it your IP address and when you opened the note. That is
+  **off by default**; turn it on under *Load covers from the web*. Covers stored
+  in your vault always work and never touch the network.
 - **Your clipboard: never.** Nothing is read from or written to it.
 - **Code execution: never.** The formula engine is a hand-written parser, not
-  `eval` — a build-failing test enforces that.
+  `eval` — a build-failing test enforces that, and another fails the build if
+  any network call appears in the source.
 
 You do not have to take that on trust. The directory's review reports no
 suspicious network patterns, no obfuscation, and reproduces the released

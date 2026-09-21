@@ -171,6 +171,47 @@ export function dismissModal(): void {
 	currentModal().close();
 }
 
+/** Drive the open dialog's text field. */
+export function typeInto(value: string, placeholder?: string): void {
+	const modal = currentModal() as Modal & { texts?: StubText[] };
+	const fields = modal.texts ?? [];
+	const field = placeholder ? fields.find((f) => f.placeholder === placeholder) : fields[0];
+	if (!field) {
+		const seen = fields.map((f) => f.placeholder || "(no placeholder)").join(", ");
+		throw new Error(`no text field${placeholder ? ` "${placeholder}"` : ""}. Present: ${seen || "none"}`);
+	}
+	field.value = value;
+	field.handler?.(value);
+}
+
+interface StubText {
+	placeholder: string;
+	value: string;
+	handler?: (value: string) => void;
+}
+
+class StubTextComponent implements StubText {
+	placeholder = "";
+	value = "";
+	handler?: (value: string) => void;
+	inputEl = makeEl();
+	setPlaceholder(text: string): this {
+		this.placeholder = text;
+		return this;
+	}
+	setValue(text: string): this {
+		this.value = text;
+		return this;
+	}
+	getValue(): string {
+		return this.value;
+	}
+	onChange(handler: (value: string) => void): this {
+		this.handler = handler;
+		return this;
+	}
+}
+
 interface StubButton {
 	label: string;
 	cta: boolean;
@@ -213,7 +254,7 @@ class StubButtonComponent implements StubButton {
  * about which handler runs, not about how a text field looks.
  */
 export class Setting {
-	private owner: { buttons?: StubButton[] } | undefined;
+	private owner: { buttons?: StubButton[]; texts?: StubText[] } | undefined;
 	constructor(containerEl?: unknown) {
 		this.owner = ownerOf(containerEl);
 	}
@@ -229,7 +270,14 @@ export class Setting {
 	setClass(): this {
 		return this;
 	}
-	addText(): this {
+	addText(callback: (text: StubTextComponent) => void): this {
+		const field = new StubTextComponent();
+		callback(field);
+		if (this.owner) {
+			const owner = this.owner as { texts?: StubText[] };
+			owner.texts = owner.texts ?? [];
+			owner.texts.push(field);
+		}
 		return this;
 	}
 	addTextArea(): this {
@@ -256,10 +304,16 @@ export class Setting {
 }
 
 /** Which open dialog a Setting's container belongs to. */
-function ownerOf(containerEl: unknown): { buttons?: StubButton[] } | undefined {
-	return openModals.find((modal) => modal.contentEl === containerEl) as
-		| { buttons?: StubButton[] }
-		| undefined;
+function ownerOf(containerEl: unknown): { buttons?: StubButton[]; texts?: StubText[] } | undefined {
+	return openModals.find(
+		(modal) => modal.contentEl === containerEl || contains(modal.contentEl, containerEl)
+	) as { buttons?: StubButton[]; texts?: StubText[] } | undefined;
+}
+
+/** A Setting may be built inside a child of the dialog, not the dialog itself. */
+function contains(root: unknown, node: unknown): boolean {
+	const el = root as { contains?: (other: unknown) => boolean } | null;
+	return !!(el && node && typeof el.contains === "function" && el.contains(node));
 }
 
 /**

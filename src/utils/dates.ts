@@ -1,5 +1,28 @@
 /** Date helpers. Everything is stored as an ISO `YYYY-MM-DD` string in frontmatter. */
 
+/**
+ * Read a Date as the calendar day it was meant to be.
+ *
+ * A date-only value in YAML -- `due: 2026-03-14` -- is parsed into midnight
+ * **UTC**. Reading that back with the local getters gives the day before for
+ * anyone west of Greenwich: a task due on the 14th displayed as the 13th, sat
+ * in the Overdue column, and filtered as though it had already passed. The
+ * whole of the Americas saw every date shifted by one.
+ *
+ * A timestamp of exactly midnight UTC is a calendar date, not an instant, so
+ * its UTC parts are the parts that were written down. Anything with a time on
+ * it is a real moment and is left in local time, where it belongs.
+ */
+export function calendarDate(d: Date): Date {
+	const isDateOnly =
+		d.getUTCHours() === 0 &&
+		d.getUTCMinutes() === 0 &&
+		d.getUTCSeconds() === 0 &&
+		d.getUTCMilliseconds() === 0;
+	if (!isDateOnly) return d;
+	return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
 export function toISODate(d: Date): string {
 	const y = d.getFullYear();
 	const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -18,7 +41,7 @@ export function today(): string {
  */
 export function parseDate(value: unknown): Date | null {
 	if (value === null || value === undefined || value === "") return null;
-	if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+	if (value instanceof Date) return isNaN(value.getTime()) ? null : calendarDate(value);
 	if (typeof value === "number") {
 		const d = new Date(value);
 		return isNaN(d.getTime()) ? null : d;

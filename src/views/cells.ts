@@ -1,9 +1,10 @@
-import { Menu, setIcon } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef } from "../types";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
 import { formatDate, toISODate } from "../utils/dates";
-import { ViewContext, openRow } from "./context";
+import { runWrite, ViewContext, openRow } from "./context";
+import { RelationPickerModal } from "../ui/relationModal";
 import { asText } from "../utils/text";
 
 const READ_ONLY: string[] = ["formula", "rollup", "created", "updated", "uniqueid"];
@@ -66,7 +67,11 @@ export function renderCell(
 }
 
 function commit(ctx: ViewContext, row: DatabaseRow, prop: PropertyDef, value: unknown): void {
-	void ctx.store.setValue(ctx.schema, row.path, prop.id, value).then(() => ctx.refresh());
+	runWrite(
+		ctx,
+		`set ${prop.name}`,
+		ctx.store.setValue(ctx.schema, row.path, prop.id, value)
+	);
 }
 
 function renderCheckbox(
@@ -377,25 +382,12 @@ function renderRelation(
 	wrapper.addEventListener("click", (evt) => {
 		evt.stopPropagation();
 		const related = prop.relationDatabaseId ? ctx.store.get(prop.relationDatabaseId) : undefined;
-		const menu = new Menu();
 		if (!related) {
-			menu.addItem((item) => item.setTitle("No related database configured").setDisabled(true));
-		} else {
-			for (const candidate of ctx.store.rows(related).slice(0, 50)) {
-				const isOn = linked.includes(candidate.name);
-				menu.addItem((item) =>
-					item
-						.setTitle(candidate.name)
-						.setChecked(isOn)
-						.onClick(() => {
-							const next = isOn
-								? linked.filter((v) => v !== candidate.name)
-								: [...linked, candidate.name];
-							commit(ctx, row, prop, next);
-						})
-				);
-			}
+			new Notice(`“${prop.name}” has no related database set. Edit the property to choose one.`);
+			return;
 		}
-		menu.showAtMouseEvent(evt);
+		new RelationPickerModal(ctx.app, related, ctx.store.rows(related), linked, (names) => {
+			commit(ctx, row, prop, names);
+		}).open();
 	});
 }

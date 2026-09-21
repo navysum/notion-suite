@@ -34,6 +34,7 @@ import { SIDEBAR_VIEW_TYPE, DatabaseSidebarView } from "./views/sidebar";
 import { renderBreadcrumb, renderTableOfContents } from "./views/pageBlocks";
 import { registerBanners } from "./ui/pageBanner";
 import { PageStyleModal } from "./ui/pageStyleModal";
+import { runDetached } from "./utils/async";
 
 export default class NotionForObsidian extends Plugin {
 	settings: NotionSettings = { ...DEFAULT_SETTINGS };
@@ -58,7 +59,7 @@ export default class NotionForObsidian extends Plugin {
 			renderTableOfContents(this.app, source, el, ctx)
 		);
 		this.registerMarkdownCodeBlockProcessor("notion-breadcrumb", (_source, el, ctx) =>
-			renderBreadcrumb(this.app, el, ctx)
+			renderBreadcrumb(el, ctx)
 		);
 		this.registerMarkdownCodeBlockProcessor("notion-widget", (source, el, ctx) =>
 			this.renderWidgetBlock(source, el, ctx)
@@ -87,6 +88,7 @@ export default class NotionForObsidian extends Plugin {
 		registerBanners(this, () => ({
 			showBanners: this.settings.showBanners,
 			bannerHeight: this.settings.bannerHeight,
+			allowRemoteCovers: this.settings.allowRemoteCovers,
 		}));
 
 		this.registerVaultListeners();
@@ -252,14 +254,14 @@ export default class NotionForObsidian extends Plugin {
 			name: "Assign unique IDs to existing rows",
 			callback: () => {
 				this.pickDatabase((schema) => {
-					void (async () => {
+					runDetached("assign unique IDs", async () => {
 						const filled = await this.store.backfillUniqueIds(schema);
 						new Notice(
 							filled === 0
 								? "Every row already has an ID."
 								: `Assigned IDs to ${filled} ${filled === 1 ? "row" : "rows"}.`
 						);
-					})();
+					});
 				});
 			},
 		});
@@ -350,7 +352,9 @@ export default class NotionForObsidian extends Plugin {
 				if (!schema || !prop) return false;
 				if (!checking) {
 					const row = this.store.rows(schema).find((r) => r.path === file.path);
-					void this.store.setValue(schema, file.path, prop.id, !row?.values[prop.id]);
+					runDetached(`set ${prop.name}`, () =>
+						this.store.setValue(schema, file.path, prop.id, !row?.values[prop.id])
+					);
 				}
 				return true;
 			},
@@ -451,7 +455,21 @@ export default class NotionForObsidian extends Plugin {
 		this.registerEvent(this.app.metadataCache.on("changed", () => this.store.invalidate()));
 		this.registerEvent(this.app.vault.on("create", () => this.store.invalidate()));
 		this.registerEvent(this.app.vault.on("delete", () => this.store.invalidate()));
-		this.registerEvent(this.app.vault.on("rename", () => this.store.invalidate()));
+		// A rename is not just a cache change: relations and sub-item links hold
+		// a note's title, so the row that moved has to be repointed to before
+		// anything re-reads it. Covers renames from the file explorer too.
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile && file.extension === "md") {
+					void this.store.relinkRenamed(oldPath, file.path).catch((error: unknown) => {
+						console.error("Notion Suite: could not repoint links after a rename", error);
+						new Notice("Some links to the renamed row could not be updated.");
+					});
+					return;
+				}
+				this.store.invalidate();
+			})
+		);
 	}
 
 	applyBodyClasses(): void {
