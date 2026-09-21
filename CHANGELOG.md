@@ -3,6 +3,69 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.7.0
+
+Six bugs found by auditing what people are hitting now that the plugin is in
+real use, and the features that were still missing.
+
+### Fixed
+
+- **Dates read a day early for anyone west of Greenwich.** A date-only value in
+  YAML parses to midnight UTC, and reading it back with the local getters gives
+  the day before: a task due on the 14th displayed as the 13th, sat in the
+  Overdue column, and filtered as though it had already passed. The whole of the
+  Americas saw every date shifted by one.
+- **Renaming a row silently broke every link into it.** Relations and sub-item
+  links hold a note's title. Obsidian rewrites wikilinks on rename, but a bare
+  title is a string it has no reason to touch, so nothing errored -- the link
+  stopped matching and sub-items quietly became top-level rows. References are
+  now repointed off the vault's own rename event, so it covers renames made in
+  the file explorer too, and a wikilink stays a wikilink, alias and all.
+- **Renaming onto a name that was taken did nothing, silently.** It now says so.
+  Renaming to blank, or to a name made only of characters Obsidian forbids,
+  no longer silently becomes "Untitled".
+- **The relation picker stopped at fifty rows**, with no search and no sign it
+  had stopped, so on a database of three hundred tasks the last two hundred and
+  fifty could not be linked at all. It is now searchable and uncapped, and says
+  how much of the database it is showing.
+- **Failed writes vanished.** Twenty-two writes ran detached with no error
+  handling, so a read-only note or a row deleted since the view drew it left the
+  old value on screen as though the click had never happened. They now report.
+- **A page cover set to a web address was fetched without asking**, which told
+  that server your IP and when you opened the note -- and contradicted the
+  README. Now a setting, off by default.
+
+### Added
+
+- **Filters and sorts are built by clicking.** Each condition is three controls;
+  the tests offered follow the property's type, and the value control does too.
+  The typed form is still the storage format, so it is a round trip both ways.
+- **Grouped tables.** Notion's Group by: a foldable band per value, each with
+  its own count and its own column totals.
+- **Properties on the page.** A row's properties at the top of its own note,
+  editable the same way they are in a view, instead of raw frontmatter.
+- **Repeating rows.** Tick one off and the next appears, dated by a rule written
+  the way you would say it -- `weekly`, `every other week`, `every Tuesday`,
+  `weekdays`.
+- **Saved views**, listed under their database in the sidebar.
+- **CSV export**, for a view or a whole database.
+- **Row icons** everywhere a row is drawn, and **totals under board columns**.
+
+### Changed
+
+- **A view draws a hundred rows and offers the rest.** Four thousand rows used
+  to take seconds to open and every keystroke in the search box paid for it
+  again. Opening a view is now flat rather than linear in the size of the
+  database, and the search waits for a pause in typing.
+- The README no longer claims formulas are arithmetic only. They have not been
+  for some time.
+
+### Behind the scenes
+
+Every bug above was put back, one at a time, to confirm a test notices --
+twenty-two for twenty-two. Five fixes turned out to have no guard at all, which
+is how two further problems were found. The suite is 312 tests.
+
 ## 1.6.5
 
 No change to how the plugin behaves. The parts of it that only ran inside
