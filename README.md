@@ -20,10 +20,11 @@ normal `.md` file you can open in any editor.
 6. [Getting around: the sidebar and full-page databases](#6-getting-around-the-sidebar-and-full-page-databases)
 7. [Filtering and sorting](#7-filtering-and-sorting)
 8. [Property types, relations and rollups](#8-property-types-relations-and-rollups)
-9. [Sub-items, unique IDs and bulk editing](#9-sub-items-unique-ids-and-bulk-editing)
+9. [Sub-items, unique IDs, bulk editing and repeats](#9-sub-items-unique-ids-bulk-editing-and-repeats)
 10. [Boards in depth](#10-boards-in-depth)
 11. [Charts](#11-charts)
 12. [Widgets](#12-widgets)
+12b. [Properties on the page, saved views, and getting your data out](#12b-properties-on-the-page-saved-views-and-getting-your-data-out)
 13. [Page furniture: icons, covers, contents, breadcrumbs, columns](#13-page-furniture-icons-covers-contents-breadcrumbs-columns)
 14. [Coming from Notion](#14-coming-from-notion)
 15. [What this plugin touches](#15-what-this-plugin-touches)
@@ -219,10 +220,12 @@ so it sticks — it isn't just a preview.
 
 **Table** — a spreadsheet. Click any cell to edit it. Click a column header to sort,
 hide it, or set a **footer calculation** (sum, average, percent checked…). Rows with
-sub-items get a twisty to fold them away.
+sub-items get a twisty to fold them away. Set **Group by** and the table splits
+into foldable bands, each with its own count and its own totals.
 
 **Board** — kanban. Drag cards between columns to change the grouping property. Empty
-columns still show, so you can drag into them. See [Boards in depth](#10-boards-in-depth).
+columns still show, so you can drag into them. Columns can carry totals as well as
+counts. See [Boards in depth](#10-boards-in-depth).
 
 **Gallery** — cards with cover images. Good for a reading list, recipes, or anything
 visual.
@@ -232,6 +235,11 @@ tickable to-do list.
 
 **Calendar** — a month grid. Hover a day and press `+` to create a row already dated to
 that day. Arrows move between months.
+
+> **Large databases.** A view draws a hundred rows and offers the rest — *"Showing
+> 100 of 1,240"*, with **Show 100 more** and **Show all**. Drawing four thousand
+> rows at once froze Obsidian for seconds; this keeps opening a view instant
+> whatever the size. A view's own `limit:` still wins.
 
 **Timeline** — a Gantt-style chart. Each row becomes a bar between a start and an end
 date. Scale it by day, week or month.
@@ -297,9 +305,17 @@ sidebar when the database *is* the thing you're working in.
 
 ## 7. Filtering and sorting
 
-Filters are written the way you'd say them out loud — in the settings dialog's
-**Filter** box, one per line. This is the one place you do type something, and
-it's deliberately English rather than syntax.
+**You build a filter by clicking.** In any view's ⚙ Settings, each condition is
+three controls — property, test, value — with **+ Add a condition** underneath
+and an **all / any** switch on top. The tests offered follow the property's
+type, so a checkbox only offers *is*, a number never offers *starts with*, and
+choosing *is empty* removes the value box because there's nothing left to
+compare. Sorting works the same way, and a second sort breaks ties rather than
+replacing the first.
+
+Underneath, a filter is still plain English, one per line — that's the storage
+format, so anything you build can be read by hand and anything you write by hand
+opens in the builder:
 
 ````markdown
 ```notion-db
@@ -332,6 +348,9 @@ filter:
   - Priority >= 3
   - (Status is Doing or Owner is me)
 ```
+
+Brackets are the one thing the click-built rows can't express, so a nested
+filter hands over to a text box rather than being silently flattened.
 
 **Operators you can use:**
 
@@ -497,7 +516,7 @@ Checkboxes count as `1` and `0`, a reference to a property that doesn't exist co
 
 ---
 
-## 9. Sub-items, unique IDs and bulk editing
+## 9. Sub-items, unique IDs, bulk editing and repeats
 
 ### Sub-items
 
@@ -526,7 +545,24 @@ Already have rows? Run **Notion: Assign unique IDs to existing rows**.
 
 Tick the box beside several rows in a table and a bar appears. It sets one
 property across every ticked row at once — the fastest way to re-triage a
-backlog.
+backlog. Deleting from that bar asks first, and tells you how many sub-items
+are about to be orphaned so you can take them too.
+
+### Repeating rows
+
+"Water the plants, every Tuesday" is a task you want back the moment you've done
+it. Set it up from a database's context menu → **Repeating rows…**: which text
+property holds the rule, which date moves, and which checkbox ticking off means
+done.
+
+Ticking the row off creates the next one, copied from the one you finished, with
+the tick cleared and the date moved on. Nothing appears until you finish the last
+one — so a fortnight away doesn't leave you fourteen identical rows.
+
+Rules are written the way you'd say them: `daily` · `weekly` · `fortnightly` ·
+`monthly` · `quarterly` · `yearly` · `every 3 days` · `every other week` ·
+`every Tuesday` · `weekdays`. Anything it can't read is ignored, so a text
+property holding ordinary prose never starts creating rows.
 
 ---
 
@@ -677,6 +713,44 @@ Every kind takes `database`, `filter` and `label`; `metric` adds `aggregate`,
 
 ---
 
+## 12b. Properties on the page, saved views, and getting your data out
+
+### Properties on the page
+
+Click a row and it opens beside the view. At the top of that note you now get the
+same property controls the view has — a select opens its menu, a date opens a
+picker, a relation opens its searchable list — instead of leaving you editing raw
+frontmatter. Nothing is written into the note's body; the panel edits the
+frontmatter that was already there.
+
+A note belongs to the most specific database whose folder contains it, so with
+both `Work` and `Work/Tasks` defined, a note in `Work/Tasks` is a task.
+
+Turn it off under *Properties on the page*.
+
+### Saved views
+
+A view is a block of settings — a filter, a sort, which properties, which type —
+and rebuilding "this week's work" every time is what saved views exist to stop.
+From any view's **⋯** menu pick **Save this view…**, give it a name, and it
+appears under its database in the sidebar. Clicking it opens a full page with the
+filter and sort intact. Right-click to forget it.
+
+### Row icons
+
+A note that sets `icon:` in its frontmatter already gets a page banner from it.
+That emoji now travels with the row: beside its title in a table and a list, on
+its card in a board, and as a gallery card's cover when there's no image.
+
+### CSV export
+
+From a view's **⋯** menu, **Export to CSV** writes what that view is showing —
+filter and sort included — to a file beside the note. From the sidebar's
+right-click menu it exports the whole database. Values are written as they
+display, so a rollup exports its number and a date exports the day you see.
+
+---
+
 ## 13. Page furniture: icons, covers, contents, breadcrumbs, columns
 
 ### Icons and covers
@@ -746,7 +820,7 @@ title, sub-items, page content, and nested pages.
   literal rather than a regex. See [Formulas](#formulas).
 - **Permissions, comments and sharing** are Notion-server features with no local
   equivalent.
-- **Dependencies** between rows aren't modelled. Sub-items are.
+- **Dependencies** between rows aren't modelled. Sub-items and repeats are.
 - **The block-level drag handle** isn't reproduced; Obsidian's editor is text-first.
 - **Synced blocks** have no equivalent. Embedding a note (`/embed`) is the nearest thing.
 
@@ -787,6 +861,8 @@ provably the code you are running.
 - **Slash command menu** — turn the `/` menu on or off.
 - **Trigger character** — use something other than `/`.
 - **Page icons and covers** — show them above the note title, and set the cover height.
+- **Properties on the page** — a row's properties, editable at the top of its note.
+- **Load covers from the web** — off by default; see [What this plugin touches](#15-what-this-plugin-touches).
 - **Notion typography** — Notion-like heading sizes, line spacing and callout styling.
 - **Default folder** — where new databases get created. Default `Databases`.
 - **Show the databases sidebar on startup**.
