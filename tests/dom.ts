@@ -203,3 +203,13 @@ export function tick(el: Element | null | undefined, checked = true): void {
 	(el as HTMLInputElement).checked = checked;
 	el.dispatchEvent(new Event("change", { bubbles: true }));
 }
+
+/**
+ * Wait for the view's debounced work (the search box) to run.
+ *
+ * The search deliberately waits for a pause in typing, so a test that types and
+ * immediately asserts is asking about a render that has not happened yet.
+ */
+export function settle(ms = 250): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}

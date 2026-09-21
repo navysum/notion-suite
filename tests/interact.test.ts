@@ -267,3 +267,88 @@ test("dragging a card between columns writes only the column it landed in", asyn
 	assert.equal(written[0].value, "Done");
 	assert.equal(written[0].path, "Databases/Tasks/Launch.md");
 });
+
+/* ---------------------------------------------------------- bulk delete */
+
+const bulkTable: ViewConfig = { type: "table", db: "Tasks" } as unknown as ViewConfig;
+
+function mountBulk(rows: DatabaseRow[]) {
+	const { store, deleted } = fakeStore(rows);
+	const container = host();
+	const ctx = {
+		app: { workspace: fakeWorkspace([]).workspace },
+		store,
+		schema,
+		sourcePath: "Note.md",
+		refresh: () => renderDatabaseView(container, ctx, bulkTable),
+	} as unknown as ViewContext;
+	renderDatabaseView(container, ctx, bulkTable);
+	return { container, deleted };
+}
+
+function tickRow(container: HTMLElement, name: string): void {
+	const rows = all(container, ".nfo-tr");
+	const row = rows.find((el) => el.textContent?.includes(name)) ?? null;
+	const box = row?.querySelector(".nfo-row-select");
+	if (!box) throw new Error(`no tick box for "${name}"`);
+	(box as HTMLInputElement).checked = true;
+	box.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/**
+ * Deleting one row has always asked. Deleting eighty used to empty the
+ * selection on the spot, with no dialog at all.
+ */
+test("bulk delete asks before deleting anything", async () => {
+	const { container, deleted } = mountBulk(family());
+	tickRow(container, "Unrelated");
+
+	click(container.querySelector(".nfo-bulk-danger"));
+	await Promise.resolve();
+
+	assert.deepEqual(deleted, [], "rows went before the question was answered");
+	dismissModal();
+	await Promise.resolve();
+	assert.deepEqual(deleted, [], "dismissing the dialog still deleted them");
+});
+
+test("confirming a bulk delete deletes exactly what was ticked", async () => {
+	const { container, deleted } = mountBulk(family());
+	tickRow(container, "Unrelated");
+
+	click(container.querySelector(".nfo-bulk-danger"));
+	await Promise.resolve();
+	pressButton("Delete 1 row");
+	for (let i = 0; i < 6; i++) await Promise.resolve();
+
+	assert.deepEqual(deleted, ["Databases/Tasks/Unrelated.md"]);
+});
+
+/** The bulk path used to orphan sub-items silently; now it counts them. */
+test("bulk delete offers to take unticked sub-items too", async () => {
+	const { container, deleted } = mountBulk(family());
+	tickRow(container, "Launch");
+
+	click(container.querySelector(".nfo-bulk-danger"));
+	await Promise.resolve();
+	pressButton("Delete all 3");
+	for (let i = 0; i < 8; i++) await Promise.resolve();
+
+	assert.deepEqual(deleted.sort(), [
+		"Databases/Tasks/Draft copy.md",
+		"Databases/Tasks/Launch.md",
+		"Databases/Tasks/Proofread.md",
+	]);
+});
+
+test("bulk delete can leave the sub-items behind", async () => {
+	const { container, deleted } = mountBulk(family());
+	tickRow(container, "Launch");
+
+	click(container.querySelector(".nfo-bulk-danger"));
+	await Promise.resolve();
+	pressButton("Delete the 1 ticked");
+	for (let i = 0; i < 6; i++) await Promise.resolve();
+
+	assert.deepEqual(deleted, ["Databases/Tasks/Launch.md"]);
+});

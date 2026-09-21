@@ -10,11 +10,12 @@ import {
 	formatCalculation,
 } from "../db/calculate";
 import { RollupFunction, RowTemplate, isFilterGroup } from "../types";
-import { buildTree, TreeRow } from "../db/tree";
+import { buildTree, descendantsOf, TreeRow } from "../db/tree";
 import { DERIVED_TYPES } from "../db/store";
 import { BulkValueModal } from "../ui/bulkModal";
 import { PropertyModal } from "../ui/propertyModal";
 import { ManageTemplatesModal } from "../ui/templateModal";
+import { choose, confirm } from "../ui/confirmModal";
 
 export function renderTable(
 	container: HTMLElement,
@@ -295,12 +296,7 @@ function renderBulkBar(container: HTMLElement, ctx: ViewContext, rows: DatabaseR
 	setIcon(deleteBtn.createSpan(), "trash");
 	deleteBtn.createSpan({ text: "Delete" });
 	deleteBtn.addEventListener("click", () => {
-		void (async () => {
-			for (const row of live) await ctx.store.deleteRow(row.path);
-			selected.clear();
-			new Notice(`Deleted ${live.length} ${live.length === 1 ? "row" : "rows"}.`);
-			ctx.refresh();
-		})();
+		void deleteSelected(ctx, live, selected);
 	});
 
 	const clearBtn = bar.createDiv({ cls: "nfo-bulk-action" });
@@ -309,6 +305,86 @@ function renderBulkBar(container: HTMLElement, ctx: ViewContext, rows: DatabaseR
 		selected.clear();
 		ctx.refresh();
 	});
+}
+
+/**
+ * Delete every ticked row, asking first.
+ *
+ * Deleting one row has always asked, and asked again about anything nested
+ * under it. Deleting eighty did neither: it emptied the selection on the spot
+ * and orphaned every sub-item on the way. A bulk action is the one that most
+ * needs the question, not the one that least does.
+ */
+async function deleteSelected(
+	ctx: ViewContext,
+	rows: DatabaseRow[],
+	selected: Set<string>
+): Promise<void> {
+	if (rows.length === 0) return;
+
+	const all = ctx.store.rows(ctx.schema);
+	const ticked = new Set(rows.map((row) => row.path));
+	// Sub-items that are not themselves ticked. Anything already in the
+	// selection is going anyway and must not be counted twice.
+	const orphans = new Map<string, DatabaseRow>();
+	for (const row of rows) {
+		for (const child of descendantsOf(ctx.schema, all, row.path)) {
+			if (!ticked.has(child.path)) orphans.set(child.path, child);
+		}
+	}
+
+	const count = `${rows.length} ${rows.length === 1 ? "row" : "rows"}`;
+	let alsoChildren = false;
+
+	if (orphans.size > 0) {
+		const nested = `${orphans.size} ${orphans.size === 1 ? "row is" : "rows are"}`;
+		const answer = await choose(ctx.app, {
+			title: `Delete ${count}?`,
+			body: `${nested} nested under what you have ticked, and not ticked themselves.`,
+			detail:
+				"Keeping them leaves them pointing at notes that no longer exist, " +
+				"so they become top-level rows.",
+			choices: [
+				{ id: "ticked", label: `Delete the ${rows.length} ticked` },
+				{
+					id: "all",
+					label: `Delete all ${rows.length + orphans.size}`,
+					cta: true,
+					destructive: true,
+				},
+			],
+		});
+		// Dismissing cancels outright rather than picking an answer.
+		if (answer === null) return;
+		alsoChildren = answer === "all";
+	} else {
+		const ok = await confirm(ctx.app, {
+			title: `Delete ${count}?`,
+			body: "The notes go to your vault's trash, so this can be undone there.",
+			confirmText: `Delete ${count}`,
+			destructive: true,
+		});
+		if (!ok) return;
+	}
+
+	const targets = alsoChildren ? [...rows, ...orphans.values()] : rows;
+	let deleted = 0;
+	try {
+		for (const row of targets) {
+			await ctx.store.deleteRow(row.path);
+			deleted++;
+		}
+	} catch (error) {
+		console.error("Notion Suite: deleting rows failed", error);
+		new Notice(`Deleted ${deleted} of ${targets.length} rows, then hit an error.`);
+		selected.clear();
+		ctx.refresh();
+		return;
+	}
+
+	selected.clear();
+	new Notice(`Deleted ${deleted} ${deleted === 1 ? "row" : "rows"}.`);
+	ctx.refresh();
 }
 
 /** Ask for one value, then write it to every selected row. */

@@ -13,6 +13,22 @@ import { PropertyModal } from "../ui/propertyModal";
 import { addEditButton } from "./blockEdit";
 import { SurfaceState, surfaceState } from "./viewState";
 
+/**
+ * How many rows a view draws before offering the rest.
+ *
+ * Big enough that an ordinary database is never truncated, small enough that a
+ * four-thousand-row import opens instantly instead of freezing the app.
+ */
+export const PAGE_SIZE = 100;
+
+/**
+ * How long the search box waits before re-running.
+ *
+ * Every keystroke used to redraw the whole view synchronously, so typing into a
+ * large database stuttered a word behind. One render per pause instead.
+ */
+export const SEARCH_DEBOUNCE_MS = 150;
+
 export function renderDatabaseView(
 	container: HTMLElement,
 	ctx: ViewContext,
@@ -45,6 +61,16 @@ export function renderDatabaseView(
 
 	renderToolbar(container, ctx, view, activeType, state, rows.length);
 
+	// Changing the search is a new question, so start its answer at page one
+	// rather than leaving a "show all" from the previous term in force.
+	if (state.shownFor !== state.search) {
+		state.shownFor = state.search;
+		state.shown = PAGE_SIZE;
+	}
+	const total = rows.length;
+	const shown = Math.min(state.shown ?? PAGE_SIZE, total);
+	if (shown < total) rows = rows.slice(0, shown);
+
 	const bodyEl = container.createDiv({ cls: "nfo-view-body" });
 	switch (activeType) {
 		case "board":
@@ -65,6 +91,42 @@ export function renderDatabaseView(
 		default:
 			renderTable(bodyEl, ctx, view, rows, properties);
 	}
+
+	if (shown < total) renderMore(container, ctx, state, shown, total);
+}
+
+/**
+ * The footer offering the rows a view is holding back.
+ *
+ * Stating the real total matters as much as the button does: a silently
+ * truncated view and a view that genuinely has a hundred rows look identical,
+ * and the first one quietly lies about your data.
+ */
+function renderMore(
+	container: HTMLElement,
+	ctx: ViewContext,
+	state: SurfaceState,
+	shown: number,
+	total: number
+): void {
+	const bar = container.createDiv({ cls: "nfo-more-bar" });
+	bar.createSpan({
+		cls: "nfo-more-count",
+		text: `Showing ${shown.toLocaleString()} of ${total.toLocaleString()}`,
+	});
+
+	const step = Math.min(PAGE_SIZE, total - shown);
+	const more = bar.createDiv({ cls: "nfo-more-btn", text: `Show ${step.toLocaleString()} more` });
+	more.addEventListener("click", () => {
+		state.shown = shown + PAGE_SIZE;
+		ctx.refresh();
+	});
+
+	const rest = bar.createDiv({ cls: "nfo-more-btn nfo-more-all", text: "Show all" });
+	rest.addEventListener("click", () => {
+		state.shown = total;
+		ctx.refresh();
+	});
 }
 
 /**
@@ -200,15 +262,23 @@ function renderToolbar(
 	const search = actions.createEl("input", { cls: "nfo-search", type: "search" });
 	search.placeholder = "Search…";
 	search.value = state.search;
+	// Searching redraws the whole view, so wait for a pause in typing rather
+	// than paying for it on every keystroke. The input is not re-rendered in
+	// between, so what you typed stays on screen either way.
+	let pending: number | null = null;
 	search.addEventListener("input", () => {
-		state.search = search.value;
-		ctx.refresh();
-		// Re-rendering replaces the input, so restore focus and caret position.
-		const next = container.querySelector<HTMLInputElement>(".nfo-search");
-		if (next) {
-			next.focus();
-			next.setSelectionRange(next.value.length, next.value.length);
-		}
+		if (pending !== null) window.clearTimeout(pending);
+		pending = window.setTimeout(() => {
+			pending = null;
+			state.search = search.value;
+			ctx.refresh();
+			// Re-rendering replaces the input, so restore focus and caret position.
+			const next = container.querySelector<HTMLInputElement>(".nfo-search");
+			if (next) {
+				next.focus();
+				next.setSelectionRange(next.value.length, next.value.length);
+			}
+		}, SEARCH_DEBOUNCE_MS);
 	});
 
 	if (ctx.requestEdit) {
