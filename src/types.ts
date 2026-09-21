@@ -348,6 +348,15 @@ export interface DatabaseSchema {
 	/** Named pre-filled rows, offered from the "New" button. */
 	rowTemplates?: RowTemplate[];
 	/** Property holding each row's parent, which turns rows into a tree. */
+	/**
+	 * Repeating rows: which property holds the rule, which date advances, and
+	 * which checkbox ticking off creates the next one.
+	 */
+	recurrence?: {
+		rule: string;
+		date: string;
+		trigger: string;
+	};
 	parentProperty?: string;
 	/** Number property holding manual ordering. */
 	orderProperty?: string;

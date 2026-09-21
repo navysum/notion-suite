@@ -1,4 +1,4 @@
-import { setIcon } from "obsidian";
+import { Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
 import { formatValue, isEmpty } from "../db/value";
@@ -27,7 +27,16 @@ export function renderList(
 				runWrite(
 					ctx,
 					`set ${checkbox.name}`,
-					ctx.store.setValue(ctx.schema, row.path, checkbox.id, box.checked)
+					(async () => {
+						await ctx.store.setValue(ctx.schema, row.path, checkbox.id, box.checked);
+						const next = await ctx.store.repeatIfDue(
+							ctx.schema,
+							row.path,
+							checkbox.id,
+							box.checked
+						);
+						if (next) new Notice(`“${row.name}” repeats — next one due ${next}.`);
+					})()
 				);
 			});
 			if (box.checked) item.addClass("nfo-list-done");

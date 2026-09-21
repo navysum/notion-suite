@@ -5,6 +5,7 @@ import { renderDatabaseView } from "./renderer";
 import { ViewContext } from "./context";
 import { viewIcon } from "./renderer";
 import { runDetached } from "../utils/async";
+import { RecurrenceModal } from "../ui/recurrenceModal";
 
 export const DATABASE_VIEW_TYPE = "notion-suite-database";
 
@@ -212,6 +213,14 @@ export function databaseContextMenu(
 			.setTitle("Add a property…")
 			.setIcon("plus")
 			.onClick(() => plugin.openPropertyEditor(schema))
+	);
+	menu.addItem((item) =>
+		item
+			.setTitle("Repeating rows…")
+			.setIcon("repeat")
+			.onClick(() => {
+				new RecurrenceModal(plugin.app, plugin.store, schema, () => undefined).open();
+			})
 	);
 	menu.addItem((item) =>
 		item

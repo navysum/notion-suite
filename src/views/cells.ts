@@ -70,7 +70,12 @@ function commit(ctx: ViewContext, row: DatabaseRow, prop: PropertyDef, value: un
 	runWrite(
 		ctx,
 		`set ${prop.name}`,
-		ctx.store.setValue(ctx.schema, row.path, prop.id, value)
+		(async () => {
+			await ctx.store.setValue(ctx.schema, row.path, prop.id, value);
+			// Ticking off a repeating row creates its next occurrence.
+			const next = await ctx.store.repeatIfDue(ctx.schema, row.path, prop.id, value);
+			if (next) new Notice(`“${row.name}” repeats — next one due ${next}.`);
+		})()
 	);
 }
 

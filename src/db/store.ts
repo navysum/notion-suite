@@ -11,6 +11,7 @@ import {
 import { coerce } from "./value";
 import { RowResolver } from "./resolve";
 import { csvFileName, rowsToCsv } from "./csv";
+import { nextDateFor, parseRecurrence } from "./recur";
 import { autoColor } from "../utils/dom";
 import { asText, linkTarget } from "../utils/text";
 
@@ -387,6 +388,51 @@ export class DatabaseStore extends Events {
 	 * snapped back with no explanation and no way to tell a refusal from a
 	 * failure. Callers now get a reason they can show.
 	 */
+	/**
+	 * If ticking this row off should create its next occurrence, create it.
+	 *
+	 * The trigger is completion rather than a timer, which is both simpler and
+	 * closer to how a task list is used: nothing appears until you have finished
+	 * the last one, so a fortnight away does not leave fourteen identical rows
+	 * waiting for you.
+	 *
+	 * Returns the new row's date when one was made, so the caller can say so.
+	 */
+	async repeatIfDue(
+		schema: DatabaseSchema,
+		rowPath: string,
+		propertyId: string,
+		value: unknown
+	): Promise<string | null> {
+		const config = schema.recurrence;
+		if (!config || config.trigger !== propertyId || value !== true) return null;
+
+		const row = this.rows(schema).find((candidate) => candidate.path === rowPath);
+		if (!row) return null;
+
+		const rule = parseRecurrence(row.values[config.rule]);
+		if (!rule) return null;
+
+		const nextDate = nextDateFor(rule, row.values[config.date]);
+
+		// The new row starts as a copy of this one, minus the tick that created
+		// it and with the date moved on. Copying rather than starting blank is
+		// the point: the whole row is the template.
+		const seed: Record<string, unknown> = {};
+		for (const prop of schema.properties) {
+			if (DERIVED_TYPES.includes(prop.type) || prop.type === "uniqueid") continue;
+			if (prop.id === config.trigger) continue;
+			if (prop.id === config.date) continue;
+			const current = row.values[prop.id];
+			if (current !== null && current !== undefined && current !== "") seed[prop.id] = current;
+		}
+		seed[config.date] = nextDate;
+		seed[config.trigger] = false;
+
+		await this.createRow(schema, row.name, seed);
+		return nextDate;
+	}
+
 	async renameRow(rowPath: string, newName: string): Promise<RenameResult> {
 		const file = this.getFile(rowPath);
 		if (!file) return { ok: false, reason: "That note no longer exists." };
