@@ -417,9 +417,7 @@ export class DatabaseStore extends Events {
 			if (keys.length === 0) continue;
 
 			for (const file of this.folderFiles(schema.folder)) {
-				const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter as
-					| Record<string, unknown>
-					| undefined;
+				const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 				if (!frontmatter) continue;
 				// Check the in-memory cache before touching the disk: on a large
 				// vault most notes reference nothing that was renamed.
