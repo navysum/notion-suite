@@ -21,7 +21,7 @@ export interface BannerSettings {
 }
 
 /** Resolve a cover value to something an <img> can load. */
-function coverSource(
+export function coverSource(
 	app: App,
 	value: unknown,
 	sourcePath: string,
