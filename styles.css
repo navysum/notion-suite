@@ -1626,3 +1626,36 @@ body.nfo-typography hr {
 
 .callout[data-callout^="nfo-h"] .callout-title { padding: 0; color: var(--text-normal); }
 .callout[data-callout^="nfo-h"] .callout-content { padding-left: 2px; }
+
+/* The footer a view shows when it is holding rows back. */
+.nfo-more-bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 6px 4px;
+	border-top: 1px solid var(--background-modifier-border);
+	margin-top: 4px;
+}
+
+.nfo-more-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-more-btn {
+	cursor: pointer;
+	padding: 3px 10px;
+	border-radius: var(--radius-s);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.nfo-more-btn:hover {
+	background: var(--background-modifier-active-hover);
+}
+
+.nfo-more-all {
+	background: transparent;
+	color: var(--text-muted);
+}

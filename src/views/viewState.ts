@@ -45,6 +45,18 @@ export interface SurfaceState {
 	calendarMonth?: Date;
 	/** The first bucket a timeline view is scrolled to. */
 	timelineAnchor?: Date;
+	/**
+	 * How many rows this surface is currently drawing.
+	 *
+	 * A view with no `limit:` used to render every row it had. An imported
+	 * Notion workspace is routinely thousands of rows, and each one costs a
+	 * table row's worth of elements and listeners, so opening the view locked
+	 * Obsidian up for seconds and every keystroke in the search box paid for it
+	 * again. Views now draw a page at a time and offer the rest.
+	 */
+	shown?: number;
+	/** The search term `shown` was last reset for. */
+	shownFor?: string;
 }
 
 function blank(): SurfaceState {

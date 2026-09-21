@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { all, click, host, installDom, texts, tick, type } from "./dom";
+import { all, click, host, installDom, settle, texts, tick, type } from "./dom";
 
 installDom();
 
@@ -69,16 +69,18 @@ const calendar: ViewConfig = { type: "calendar", db: "Tasks", dateProperty: "due
  * Shipped twice: the search box was keyed on an element the refresh rebuilt, so
  * typing a letter destroyed the thing holding what you had typed.
  */
-test("the search box keeps what you typed, and keeps narrowing", () => {
+test("the search box keeps what you typed, and keeps narrowing", async () => {
 	const { container } = mount(table);
 	assert.equal(all(container, ".nfo-row-title").length, 3);
 
 	type(container.querySelector(".nfo-search"), "the");
+	await settle();
 	assert.deepEqual(texts(container, ".nfo-row-title"), ["Write the spec", "Ship the thing"]);
 	assert.equal(container.querySelector<HTMLInputElement>(".nfo-search")?.value, "the");
 
 	// A second keystroke has to narrow further, not start over.
 	type(container.querySelector(".nfo-search"), "the s");
+	await settle();
 	assert.deepEqual(texts(container, ".nfo-row-title"), ["Write the spec"]);
 	assert.equal(container.querySelector<HTMLInputElement>(".nfo-search")?.value, "the s");
 });
@@ -106,9 +108,10 @@ test("calendar navigation actually advances, and Today comes back", () => {
 });
 
 /** The same state, on the way back: switching views must not lose the search. */
-test("switching view type keeps the search", () => {
+test("switching view type keeps the search", async () => {
 	const { container } = mount(table);
 	type(container.querySelector(".nfo-search"), "room");
+	await settle();
 	assert.deepEqual(texts(container, ".nfo-row-title"), ["Book a room"]);
 	assert.equal(container.querySelector<HTMLInputElement>(".nfo-search")?.value, "room");
 });
@@ -149,7 +152,7 @@ function mountTree(view: ViewConfig): HTMLElement {
  * re-appended the descendants it had just folded away. Then it had to survive a
  * refresh as well.
  */
-test("a collapsed row stays collapsed across a refresh", () => {
+test("a collapsed row stays collapsed across a refresh", async () => {
 	const container = mountTree(table);
 	assert.equal(texts(container, ".nfo-row-title").length, 3);
 
@@ -158,6 +161,7 @@ test("a collapsed row stays collapsed across a refresh", () => {
 
 	// Anything at all that redraws the view must not unfold them.
 	type(container.querySelector(".nfo-search"), "");
+	await settle();
 	assert.deepEqual(texts(container, ".nfo-row-title"), ["Launch"], "the row sprang back open");
 
 	click(container.querySelector(".nfo-row-twisty-active"));
@@ -165,13 +169,14 @@ test("a collapsed row stays collapsed across a refresh", () => {
 });
 
 /** Ticked rows are the same kind of state, and were lost by the same bug. */
-test("ticked rows stay ticked across a refresh", () => {
+test("ticked rows stay ticked across a refresh", async () => {
 	const container = mountTree(table);
 	const boxes = () => all(container, ".nfo-row-select") as unknown as HTMLInputElement[];
 	tick(boxes()[0]);
 	assert.equal(boxes()[0].checked, true, "the tick did not register");
 
 	type(container.querySelector(".nfo-search"), "");
+	await settle();
 	assert.equal(boxes()[0].checked, true, "the tick was cleared by a refresh");
 });
 
@@ -190,4 +195,78 @@ test("timeline navigation advances and comes back", () => {
 
 	click(container.querySelector(".nfo-timeline-today"));
 	assert.equal(title(), start, "Today did not come back");
+});
+
+/* ------------------------------------------------------ holding rows back */
+
+function manyRows(n: number): DatabaseRow[] {
+	return Array.from({ length: n }, (_, i) => row(`Row ${i + 1}`, { status: "Todo" }));
+}
+
+function mountRows(rows: DatabaseRow[], view: ViewConfig = table): HTMLElement {
+	const container = host();
+	const ctx = {
+		app: { workspace: {} },
+		store: {
+			rows: () => rows,
+			getFile: () => null,
+			optionFor: () => undefined,
+		} as unknown as DatabaseStore,
+		schema,
+		sourcePath: "Note.md",
+		refresh: () => renderDatabaseView(container, ctx, view),
+	} as unknown as ViewContext;
+	renderDatabaseView(container, ctx, view);
+	return container;
+}
+
+/**
+ * A view with no `limit:` used to draw every row it had, which on an imported
+ * Notion workspace means thousands of table rows and a frozen app.
+ */
+test("a big database draws a page, not all of it", () => {
+	const container = mountRows(manyRows(1000));
+	assert.equal(all(container, ".nfo-row-title").length, 100);
+});
+
+/** A truncated view and a small database must not look the same. */
+test("a held-back view says how many rows there really are", () => {
+	const container = mountRows(manyRows(1000));
+	const label = container.querySelector(".nfo-more-count")?.textContent ?? "";
+	assert.match(label, /Showing 100 of 1,000/);
+});
+
+test("a small database says nothing and holds nothing back", () => {
+	const container = mountRows(manyRows(12));
+	assert.equal(all(container, ".nfo-row-title").length, 12);
+	assert.equal(container.querySelector(".nfo-more-bar"), null);
+});
+
+test("show more adds a page; show all finishes the job", () => {
+	const container = mountRows(manyRows(250));
+	click(container.querySelector(".nfo-more-btn"));
+	assert.equal(all(container, ".nfo-row-title").length, 200);
+
+	click(container.querySelector(".nfo-more-all"));
+	assert.equal(all(container, ".nfo-row-title").length, 250);
+	assert.equal(container.querySelector(".nfo-more-bar"), null, "still offering more at the end");
+});
+
+/** A view's own `limit:` is the author's decision and must still win. */
+test("an explicit limit is not overridden by the page size", () => {
+	const container = mountRows(manyRows(1000), { type: "table", db: "Tasks", pageSize: 5 } as unknown as ViewConfig);
+	assert.equal(all(container, ".nfo-row-title").length, 5);
+	assert.equal(container.querySelector(".nfo-more-bar"), null);
+});
+
+/** Searching is a new question, so it starts again at page one. */
+test("a new search resets how much is shown", async () => {
+	const container = mountRows(manyRows(1000));
+	click(container.querySelector(".nfo-more-all"));
+	assert.equal(all(container, ".nfo-row-title").length, 1000);
+
+	type(container.querySelector(".nfo-search"), "Row 1");
+	await settle();
+	assert.equal(all(container, ".nfo-row-title").length, 100);
+	assert.match(container.querySelector(".nfo-more-count")?.textContent ?? "", /of 112/);
 });
