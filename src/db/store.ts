@@ -437,16 +437,19 @@ export class DatabaseStore extends Events {
 		const file = this.getFile(rowPath);
 		if (!file) return { ok: false, reason: "That note no longer exists." };
 
-		const clean = sanitizeFileName(newName);
-		if (!clean) return { ok: false, reason: "A row needs a name." };
-		if (clean === file.basename) return { ok: true, path: file.path };
+		const asked = newName.trim();
+		if (!asked) return { ok: false, reason: "A row needs a name." };
 
-		if (clean !== newName.trim()) {
-			// Obsidian refuses these outright, so say so rather than silently
-			// renaming to something the user did not type.
-			const stripped = newName.trim();
-			if (!clean) return { ok: false, reason: `“${stripped}” is not a usable file name.` };
+		// `sanitizeFileName` falls back to "Untitled" so that creating a row
+		// always succeeds. Renaming is not creating: silently turning someone's
+		// typing into "Untitled" is worse than telling them it cannot be used.
+		const stripped = asked.replace(/[\\/:*?"<>|#^[\]]/g, "").trim();
+		if (!stripped) {
+			return { ok: false, reason: `“${asked}” is not a usable file name.` };
 		}
+
+		const clean = sanitizeFileName(stripped);
+		if (clean === file.basename) return { ok: true, path: file.path };
 
 		const target = normalizePath(`${file.parent?.path ?? ""}/${clean}.md`).replace(/^\/+/, "");
 		if (this.app.vault.getAbstractFileByPath(target)) {
