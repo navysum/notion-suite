@@ -186,6 +186,24 @@ export class DatabaseStore extends Events {
 		);
 	}
 
+	/**
+	 * Which database, if any, a note belongs to.
+	 *
+	 * A database is a folder, so a note is a row of the most specific database
+	 * whose folder contains it. Most specific matters: with both `Work` and
+	 * `Work/Tasks` defined, a note in `Work/Tasks` is a task, not a work item.
+	 */
+	schemaForPath(path: string): DatabaseSchema | undefined {
+		let best: DatabaseSchema | undefined;
+		for (const schema of this.schemas) {
+			const folder = schema.folder.replace(/\/+$/, "");
+			if (path === folder || path.startsWith(`${folder}/`)) {
+				if (!best || folder.length > best.folder.length) best = schema;
+			}
+		}
+		return best;
+	}
+
 	/** Invalidate caches and let views know they should redraw. */
 	invalidate(): void {
 		this.resolver.clear();

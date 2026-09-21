@@ -18,6 +18,8 @@ export interface NotionSettings {
 	sidePeek: boolean;
 	openSidebarOnStart: boolean;
 	showBanners: boolean;
+	/** Show a row's properties at the top of its own note. */
+	showPropertyPanel: boolean;
 	/** Allow a cover set to an http(s) URL to be fetched. Off by default. */
 	allowRemoteCovers: boolean;
 	bannerHeight: number;
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	sidePeek: true,
 	openSidebarOnStart: true,
 	showBanners: true,
+	showPropertyPanel: true,
 	allowRemoteCovers: false,
 	bannerHeight: 180,
 	compactRows: false,
@@ -106,6 +109,14 @@ export class NotionSettingTab extends PluginSettingTab {
 						desc: "Show an emoji and a banner image at the top of notes that set them in frontmatter.",
 						aliases: ["banner", "emoji", "header", "cover", "image"],
 						control: { type: "toggle", key: "showBanners", defaultValue: true },
+					},
+					{
+						name: "Properties on the page",
+						desc:
+							"Show a row's properties at the top of its own note, editable the same way " +
+							"they are in a view, instead of leaving you with raw frontmatter.",
+						aliases: ["panel", "page", "row", "frontmatter", "properties"],
+						control: { type: "toggle", key: "showPropertyPanel", defaultValue: true },
 					},
 					{
 						name: "Load covers from the web",

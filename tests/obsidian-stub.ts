@@ -107,6 +107,9 @@ export class Notice {
 	constructor(public message: string) {}
 }
 export class TFile {}
+export class MarkdownView {}
+export class Plugin {}
+export class MarkdownRenderChild {}
 export class TFolder {}
 export class Menu {
 	addItem(): this {

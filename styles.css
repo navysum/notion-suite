@@ -1844,3 +1844,55 @@ body.nfo-typography hr {
 .nfo-group-calc + .nfo-group-calc {
 	margin-left: 14px;
 }
+
+/* A row's properties, shown at the top of its own note. */
+.nfo-props {
+	margin: 4px 0 18px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.nfo-props-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	min-height: 28px;
+	padding: 1px 0;
+}
+
+.nfo-props-label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 34%;
+	max-width: 190px;
+	flex-shrink: 0;
+	padding-top: 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.nfo-props-icon {
+	display: flex;
+	align-items: center;
+	color: var(--text-faint);
+}
+
+.nfo-props-value {
+	flex: 1;
+	min-width: 0;
+}
+
+.nfo-props-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-top: 6px;
+	cursor: pointer;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-props-add:hover {
+	color: var(--text-normal);
+}
