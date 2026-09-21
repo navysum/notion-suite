@@ -1,15 +1,18 @@
-import { ItemView, Menu, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import type NotionForObsidian from "../main";
 import { DatabaseSchema, ViewConfig, ViewType } from "../types";
 import { renderDatabaseView } from "./renderer";
 import { ViewContext } from "./context";
 import { viewIcon } from "./renderer";
+import { runDetached } from "../utils/async";
 
 export const DATABASE_VIEW_TYPE = "notion-suite-database";
 
 export interface DatabaseViewState {
 	databaseId: string;
 	viewType: ViewType;
+	/** A saved view on the database, when one was chosen. */
+	viewId?: string;
 }
 
 /**
@@ -33,6 +36,7 @@ export class DatabaseItemView extends ItemView {
 	 * typing in the search box would clear the search box.
 	 */
 	private bodyEl: HTMLElement | null = null;
+	private viewId: string | undefined;
 
 	constructor(leaf: WorkspaceLeaf, private plugin: NotionForObsidian) {
 		super(leaf);
@@ -52,12 +56,13 @@ export class DatabaseItemView extends ItemView {
 		const incoming = state as Partial<DatabaseViewState> | null;
 		if (incoming?.databaseId) this.databaseId = incoming.databaseId;
 		if (incoming?.viewType) this.viewType = incoming.viewType;
+		this.viewId = incoming?.viewId;
 		await super.setState(state, result as Parameters<ItemView["setState"]>[1]);
 		this.render();
 	}
 
 	getState(): Record<string, unknown> {
-		return { databaseId: this.databaseId, viewType: this.viewType };
+		return { databaseId: this.databaseId, viewType: this.viewType, viewId: this.viewId };
 	}
 
 	protected async onOpen(): Promise<void> {
@@ -101,7 +106,11 @@ export class DatabaseItemView extends ItemView {
 			this.bodyEl = container.createDiv({ cls: "nfo-page-body" });
 		}
 		const body = this.bodyEl;
-		const view: ViewConfig = {
+		// A saved view brings its own filter, sort and hidden properties. Falling
+		// back to a bare config rather than to nothing means a saved view that
+		// has since been deleted still opens the database.
+		const saved = this.viewId ? schema.views.find((v) => v.id === this.viewId) : undefined;
+		const view: ViewConfig = saved ?? {
 			id: `page-${schema.id}`,
 			name: "",
 			type: this.viewType,
@@ -157,13 +166,14 @@ export class DatabaseItemView extends ItemView {
 export async function openDatabaseTab(
 	plugin: NotionForObsidian,
 	schema: DatabaseSchema,
-	viewType: ViewType = "table"
+	viewType: ViewType = "table",
+	viewId?: string
 ): Promise<void> {
 	const existing = plugin.app.workspace
 		.getLeavesOfType(DATABASE_VIEW_TYPE)
 		.find((leaf) => {
 			const state = leaf.view.getState() as Partial<DatabaseViewState>;
-			return state.databaseId === schema.id;
+			return state.databaseId === schema.id && state.viewId === viewId;
 		});
 
 	if (existing) {
@@ -175,7 +185,7 @@ export async function openDatabaseTab(
 	await leaf.setViewState({
 		type: DATABASE_VIEW_TYPE,
 		active: true,
-		state: { databaseId: schema.id, viewType },
+		state: { databaseId: schema.id, viewType, viewId },
 	});
 	await plugin.app.workspace.revealLeaf(leaf);
 }
@@ -202,6 +212,19 @@ export function databaseContextMenu(
 			.setTitle("Add a property…")
 			.setIcon("plus")
 			.onClick(() => plugin.openPropertyEditor(schema))
+	);
+	menu.addItem((item) =>
+		item
+			.setTitle("Export to CSV")
+			.setIcon("download")
+			.onClick(() => {
+				runDetached("export that database", async () => {
+					const rows = plugin.store.rows(schema);
+					const properties = schema.properties.filter((prop) => !prop.hidden);
+					const path = await plugin.store.writeCsv(schema, rows, properties, schema.folder);
+					new Notice(`Exported ${rows.length} rows to ${path}`);
+				});
+			})
 	);
 	menu.showAtMouseEvent(evt);
 }

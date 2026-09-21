@@ -10,6 +10,7 @@ import {
 } from "../types";
 import { coerce } from "./value";
 import { RowResolver } from "./resolve";
+import { csvFileName, rowsToCsv } from "./csv";
 import { autoColor } from "../utils/dom";
 import { asText, linkTarget } from "../utils/text";
 
@@ -515,6 +516,32 @@ export class DatabaseStore extends Events {
 			target.nextId = next;
 		});
 		return missing.length;
+	}
+
+	/**
+	 * Write rows to a CSV file in the vault, and return where it landed.
+	 *
+	 * It goes beside the note that asked for it, so the file turns up where the
+	 * person was working rather than in some export folder they have to go
+	 * looking for. A name that is taken gains a number rather than overwriting
+	 * an export someone may still want.
+	 */
+	async writeCsv(
+		schema: DatabaseSchema,
+		rows: DatabaseRow[],
+		properties: PropertyDef[],
+		nearPath: string
+	): Promise<string> {
+		const folder = nearPath.includes("/") ? nearPath.slice(0, nearPath.lastIndexOf("/")) : "";
+		const base = csvFileName(schema.name);
+		let path = normalizePath(folder ? `${folder}/${base}` : base);
+		let counter = 2;
+		while (this.app.vault.getAbstractFileByPath(path)) {
+			const numbered = base.replace(/\.csv$/, ` ${counter++}.csv`);
+			path = normalizePath(folder ? `${folder}/${numbered}` : numbered);
+		}
+		await this.app.vault.create(path, rowsToCsv(rows, properties));
+		return path;
 	}
 
 	/** Create a new note in the database folder, seeded with default values. */

@@ -1910,3 +1910,13 @@ body.nfo-typography hr {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
+
+/* A saved view, listed under the database it belongs to. */
+.nfo-sidebar-view {
+	padding-left: 28px;
+}
+
+.nfo-sidebar-view .nfo-sidebar-name {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
