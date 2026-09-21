@@ -2,7 +2,7 @@ import { setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { ViewContext, openRow, rowContextMenu } from "./context";
 import { formatValue, isEmpty } from "../db/value";
-import { autoColor, pill } from "../utils/dom";
+import { autoColor, pill, rowIcon } from "../utils/dom";
 import { coverUrl } from "./board";
 import { createInlineRow } from "./table";
 
@@ -30,11 +30,13 @@ export function renderGallery(
 		} else {
 			// A stable initial keeps the grid from collapsing on cover-less rows.
 			coverBox.addClass("nfo-gallery-cover-empty");
-			coverBox.createSpan({ text: row.name.slice(0, 1).toUpperCase() });
+			coverBox.createSpan({ text: row.icon || row.name.slice(0, 1).toUpperCase() });
 		}
 
 		const bodyEl = card.createDiv({ cls: "nfo-gallery-body" });
-		const title = bodyEl.createDiv({ cls: "nfo-card-title", text: row.name });
+		const title = bodyEl.createDiv({ cls: "nfo-card-title" });
+		rowIcon(title, row.icon);
+		title.createSpan({ text: row.name });
 		title.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
 
 		const meta = bodyEl.createDiv({ cls: "nfo-card-meta" });

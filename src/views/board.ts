@@ -2,8 +2,9 @@ import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { ViewContext, openRow, rowContextMenu } from "./context";
 import { findProperty, groupRows, RowGroup } from "../db/query";
+import { calculateColumn, calculationLabel, formatCalculation } from "../db/calculate";
 import { formatValue, isEmpty } from "../db/value";
-import { autoColor, pill } from "../utils/dom";
+import { autoColor, pill, rowIcon } from "../utils/dom";
 import { asText } from "../utils/text";
 import { createInlineRow, renderTemplatePicker } from "./table";
 import { DEFAULT_ORDER_PROPERTY, positionFor, seedPositions, sortByOrder } from "../db/order";
@@ -73,6 +74,19 @@ export function renderBoard(
 		more.addEventListener("click", (evt) => columnMenu(evt, ctx, view, group, limit));
 
 		if (isCollapsed) continue;
+
+		// The totals a table shows under its columns, shown under a board's
+		// instead. A count tells you how many cards; "32 hours" tells you
+		// whether the column is actually deliverable.
+		for (const [propertyId, how] of Object.entries(view.calculate ?? {})) {
+			const prop = findProperty(ctx.schema, propertyId);
+			if (!prop) continue;
+			const total = calculateColumn(group.rows, prop, how);
+			column.createDiv({
+				cls: "nfo-board-calc",
+				text: `${prop.name} ${calculationLabel(how).toLowerCase()}: ${formatCalculation(how, total)}`,
+			});
+		}
 
 		const list = column.createDiv({ cls: "nfo-board-cards" });
 
@@ -478,7 +492,9 @@ function renderCard(
 		}
 	}
 
-	const title = card.createDiv({ cls: "nfo-card-title", text: row.name });
+	const title = card.createDiv({ cls: "nfo-card-title" });
+	rowIcon(title, row.icon);
+	title.createSpan({ text: row.name });
 	title.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
 	card.addEventListener("contextmenu", (evt) => rowContextMenu(ctx, row.path, evt));
 

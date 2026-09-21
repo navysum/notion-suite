@@ -32,3 +32,15 @@ export function autoColor(value: string): OptionColor {
 	}
 	return palette[hash % palette.length];
 }
+
+/**
+ * Draw a row's own emoji before its title, when it has one.
+ *
+ * Notion shows a page's icon everywhere that page appears. A board of identical
+ * cards is much harder to scan than one you can recognise at a glance, and the
+ * icon is already in the note's frontmatter for the page banner to use.
+ */
+export function rowIcon(container: HTMLElement, icon: string | undefined): void {
+	if (!icon) return;
+	container.createSpan({ cls: "nfo-row-icon", text: icon });
+}

@@ -1,7 +1,7 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { renderCell } from "./cells";
-import { autoColor, pill } from "../utils/dom";
+import { autoColor, pill, rowIcon } from "../utils/dom";
 import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
 import { findProperty, groupRows } from "../db/query";
 import {
@@ -542,6 +542,7 @@ function renderTitleCell(
 	row: DatabaseRow,
 	autoFocus: boolean
 ): void {
+	rowIcon(cell, row.icon);
 	const title = cell.createSpan({ cls: "nfo-row-title", text: row.name });
 
 	const beginEdit = () => {

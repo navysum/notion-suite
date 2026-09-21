@@ -1896,3 +1896,17 @@ body.nfo-typography hr {
 .nfo-props-add:hover {
 	color: var(--text-normal);
 }
+
+/* A row's own emoji, wherever that row is drawn. */
+.nfo-row-icon {
+	margin-right: 5px;
+	font-size: 1em;
+	line-height: 1;
+}
+
+/* Column totals under a board column header. */
+.nfo-board-calc {
+	padding: 2px 10px 6px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}

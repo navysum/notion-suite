@@ -334,9 +334,11 @@ export class DatabaseStore extends Events {
 					values[prop.id] = coerce(prop, (frontmatter as Record<string, unknown>)[prop.id]);
 				}
 			}
+			const rawIcon = (frontmatter as Record<string, unknown>).icon;
 			const row: DatabaseRow = {
 				path: file.path,
 				name: file.basename,
+				icon: typeof rawIcon === "string" ? rawIcon.trim() || undefined : undefined,
 				values,
 				ctime: file.stat.ctime,
 				mtime: file.stat.mtime,

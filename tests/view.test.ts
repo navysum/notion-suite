@@ -321,3 +321,33 @@ test("a band carries the column totals for its own rows", () => {
 	assert.equal(calcs.length, 3, `expected a total per band, got ${calcs.join(" | ")}`);
 	assert.ok(calcs.every((c) => c.includes("Due")), calcs.join(" | "));
 });
+
+/* ------------------------------------------------- row icons, board totals */
+
+/** Notion shows a page's icon everywhere that page appears. */
+test("a row's own emoji shows next to its title", () => {
+	const withIcons: DatabaseRow[] = [
+		{ ...row("Ship it", { status: "Doing" }), icon: "🚀" },
+		row("Plain one", { status: "Doing" }),
+	];
+	const container = mountRows(withIcons);
+	assert.deepEqual(texts(container, ".nfo-row-icon"), ["🚀"]);
+});
+
+test("a board column carries the totals for its own cards", () => {
+	const container = mountRows(rows, {
+		type: "board",
+		db: "Tasks",
+		groupBy: "status",
+		calculate: { due: "count_not_empty" },
+	} as unknown as ViewConfig);
+
+	const calcs = texts(container, ".nfo-board-calc");
+	assert.ok(calcs.length >= 3, `expected a total per column, got ${calcs.join(" | ")}`);
+	assert.ok(calcs.every((c) => c.includes("Due")), calcs.join(" | "));
+});
+
+test("a board with no calculations configured shows none", () => {
+	const container = mountRows(rows, { type: "board", db: "Tasks", groupBy: "status" } as unknown as ViewConfig);
+	assert.equal(all(container, ".nfo-board-calc").length, 0);
+});
