@@ -1,8 +1,9 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { renderCell } from "./cells";
+import { autoColor, pill } from "../utils/dom";
 import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
-import { findProperty } from "../db/query";
+import { findProperty, groupRows } from "../db/query";
 import {
 	calculateColumn,
 	calculationLabel,
@@ -50,36 +51,32 @@ export function renderTable(
 	const focusPath = ctx.takeTitleFocus ? ctx.takeTitleFocus() : null;
 
 	const body = table.createEl("tbody");
-	const tree = buildTree(ctx.schema, rows, ctx.collapsed ?? new Set());
-	for (const entry of tree) {
-		const row = entry.row;
-		const tr = body.createEl("tr", { cls: "nfo-tr" });
-		if (ctx.selected?.has(row.path)) tr.addClass("nfo-tr-selected");
+	const span = properties.length + 2;
 
-		const nameCell = tr.createEl("td", { cls: "nfo-td nfo-td-name" });
-		renderSelectBox(nameCell, ctx, row);
-		if (entry.depth > 0) {
-			nameCell.createSpan({ cls: "nfo-row-indent" }).style.width = `${entry.depth * 18}px`;
+	// A table can be grouped the way a board is: Notion's "Group by", with a
+	// foldable band per value. Grouping and sub-items are both hierarchies, so
+	// the tree is built inside each group rather than across all of them.
+	if (view.groupBy) {
+		const groups = groupRows(ctx.schema, rows, view.groupBy, {
+			dateBuckets: view.dateBuckets,
+		});
+		const collapsed = new Set(view.collapsedGroups ?? []);
+		const groupProp = findProperty(ctx.schema, view.groupBy);
+
+		for (const group of groups) {
+			// An empty group that is not a real option is noise, not information.
+			if (group.rows.length === 0 && !groupProp?.options?.some((o) => o.name === group.key)) {
+				continue;
+			}
+			const folded = collapsed.has(group.key);
+			renderGroupHeader(body, ctx, view, group, properties, span, folded, groupProp);
+			if (!folded) renderRowBlock(body, ctx, group.rows, properties, focusPath);
 		}
-		renderDisclosure(nameCell, ctx, entry);
-		renderTitleCell(nameCell, ctx, row, focusPath === row.path);
 
-		for (const prop of properties) {
-			const td = tr.createEl("td", { cls: "nfo-td" });
-			renderCell(td, ctx, row, prop);
-		}
-
-		const actions = tr.createEl("td", { cls: "nfo-td nfo-td-actions" });
-		const more = actions.createSpan({ cls: "nfo-row-more" });
-		setIcon(more, "more-horizontal");
-		more.addEventListener("click", (evt) => rowContextMenu(ctx, row.path, evt));
-	}
-
-	if (tree.length === 0) {
-		const tr = body.createEl("tr");
-		const td = tr.createEl("td", { cls: "nfo-empty-row" });
-		td.colSpan = properties.length + 2;
-		td.setText("No rows yet. Use “+ New” to add the first one.");
+		if (groups.length === 0) renderEmptyRow(body, span);
+	} else {
+		const drawn = renderRowBlock(body, ctx, rows, properties, focusPath);
+		if (drawn === 0) renderEmptyRow(body, span);
 	}
 
 	const foot = table.createEl("tfoot");
@@ -216,6 +213,101 @@ function setCalculation(
 		.join(", ");
 	if (ctx.persistKey) ctx.persistKey("calculate", `{${encoded}}`);
 	else ctx.refresh();
+}
+
+/** One band of a grouped table: a fold arrow, the value, a count, any totals. */
+function renderGroupHeader(
+	body: HTMLElement,
+	ctx: ViewContext,
+	view: ViewConfig,
+	group: { key: string; label: string; rows: DatabaseRow[] },
+	properties: PropertyDef[],
+	span: number,
+	folded: boolean,
+	groupProp: PropertyDef | undefined
+): void {
+	const tr = body.createEl("tr", { cls: "nfo-group-row" });
+	const td = tr.createEl("td", { cls: "nfo-group-cell" });
+	td.colSpan = span;
+
+	const bar = td.createDiv({ cls: "nfo-group-bar" });
+	const twisty = bar.createSpan({ cls: "nfo-group-twisty" });
+	setIcon(twisty, folded ? "chevron-right" : "chevron-down");
+	twisty.setAttribute("aria-label", folded ? "Expand group" : "Collapse group");
+
+	if (group.key === "" || !groupProp) {
+		bar.createSpan({ cls: "nfo-pill nfo-color-default", text: group.label });
+	} else {
+		const option = ctx.store.optionFor(groupProp, group.key);
+		pill(bar, group.label, option?.color ?? autoColor(group.key));
+	}
+	bar.createSpan({ cls: "nfo-group-count", text: String(group.rows.length) });
+
+	// The column totals the table already knows how to compute, per group --
+	// which is the whole reason to group a table rather than filter six views.
+	for (const [propertyId, how] of Object.entries(view.calculate ?? {})) {
+		const prop = findProperty(ctx.schema, propertyId);
+		if (!prop) continue;
+		const value = calculateColumn(group.rows, prop, how);
+		bar.createSpan({
+			cls: "nfo-group-calc",
+			text: `${prop.name} ${calculationLabel(how).toLowerCase()}: ${formatCalculation(how, value)}`,
+		});
+	}
+
+	bar.addEventListener("click", () => toggleGroup(ctx, view, group.key));
+}
+
+/** Fold a group away, remembering it in the block the way a board does. */
+function toggleGroup(ctx: ViewContext, view: ViewConfig, key: string): void {
+	const next = new Set(view.collapsedGroups ?? []);
+	if (next.has(key)) next.delete(key);
+	else next.add(key);
+	view.collapsedGroups = [...next];
+	if (ctx.persistKey) ctx.persistKey("collapsed", `[${[...next].join(", ")}]`);
+	else ctx.refresh();
+}
+
+function renderEmptyRow(body: HTMLElement, span: number): void {
+	const tr = body.createEl("tr");
+	const td = tr.createEl("td", { cls: "nfo-empty-row" });
+	td.colSpan = span;
+	td.setText("No rows yet. Use “+ new” to add the first one.");
+}
+
+/** Draw a set of rows, sub-items and all. Returns how many lines it drew. */
+function renderRowBlock(
+	body: HTMLElement,
+	ctx: ViewContext,
+	rows: DatabaseRow[],
+	properties: PropertyDef[],
+	focusPath: string | null
+): number {
+	const tree = buildTree(ctx.schema, rows, ctx.collapsed ?? new Set());
+	for (const entry of tree) {
+		const row = entry.row;
+		const tr = body.createEl("tr", { cls: "nfo-tr" });
+		if (ctx.selected?.has(row.path)) tr.addClass("nfo-tr-selected");
+
+		const nameCell = tr.createEl("td", { cls: "nfo-td nfo-td-name" });
+		renderSelectBox(nameCell, ctx, row);
+		if (entry.depth > 0) {
+			nameCell.createSpan({ cls: "nfo-row-indent" }).style.width = `${entry.depth * 18}px`;
+		}
+		renderDisclosure(nameCell, ctx, entry);
+		renderTitleCell(nameCell, ctx, row, focusPath === row.path);
+
+		for (const prop of properties) {
+			const td = tr.createEl("td", { cls: "nfo-td" });
+			renderCell(td, ctx, row, prop);
+		}
+
+		const actions = tr.createEl("td", { cls: "nfo-td nfo-td-actions" });
+		const more = actions.createSpan({ cls: "nfo-row-more" });
+		setIcon(more, "more-horizontal");
+		more.addEventListener("click", (evt) => rowContextMenu(ctx, row.path, evt));
+	}
+	return tree.length;
 }
 
 /** The tick box that puts a row into a bulk edit. */

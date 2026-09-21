@@ -270,3 +270,54 @@ test("a new search resets how much is shown", async () => {
 	assert.equal(all(container, ".nfo-row-title").length, 100);
 	assert.match(container.querySelector(".nfo-more-count")?.textContent ?? "", /of 112/);
 });
+
+/* --------------------------------------------------------- grouped tables */
+
+const grouped: ViewConfig = { type: "table", db: "Tasks", groupBy: "status" } as unknown as ViewConfig;
+
+/**
+ * Notion's table "Group by": foldable bands rather than six filtered views of
+ * the same database.
+ */
+test("a grouped table draws a band per value, with counts", () => {
+	const container = mountRows(rows, grouped);
+	const labels = texts(container, ".nfo-group-bar");
+	assert.equal(labels.length, 3, `expected three bands, got ${labels.join(" | ")}`);
+	assert.ok(labels.some((l) => l.includes("Doing") && l.includes("1")));
+});
+
+test("every row still appears, under its own band", () => {
+	const container = mountRows(rows, grouped);
+	assert.equal(all(container, ".nfo-row-title").length, rows.length);
+});
+
+test("folding a band hides its rows and nothing else", () => {
+	const container = mountRows(rows, grouped);
+	const doing = all(container, ".nfo-group-bar").find((b) => b.textContent?.includes("Doing"));
+	click(doing);
+
+	const shown = texts(container, ".nfo-row-title");
+	assert.ok(!shown.includes("Write the spec"), "the folded band's row is still showing");
+	assert.equal(shown.length, rows.length - 1);
+	// The band itself stays, so it can be unfolded again.
+	assert.equal(all(container, ".nfo-group-bar").length, 3);
+});
+
+test("an ungrouped table draws no bands at all", () => {
+	const container = mountRows(rows, table);
+	assert.equal(all(container, ".nfo-group-bar").length, 0);
+});
+
+/** Grouping without totals would just be six headings. */
+test("a band carries the column totals for its own rows", () => {
+	const container = mountRows(rows, {
+		type: "table",
+		db: "Tasks",
+		groupBy: "status",
+		calculate: { due: "count_not_empty" },
+	} as unknown as ViewConfig);
+
+	const calcs = texts(container, ".nfo-group-calc");
+	assert.equal(calcs.length, 3, `expected a total per band, got ${calcs.join(" | ")}`);
+	assert.ok(calcs.every((c) => c.includes("Due")), calcs.join(" | "));
+});

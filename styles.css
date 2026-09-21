@@ -1799,3 +1799,48 @@ body.nfo-typography hr {
 	font-family: var(--font-monospace);
 	font-size: var(--font-ui-smaller);
 }
+
+/* A grouped table: a foldable band per value of the grouping property. */
+.nfo-group-row td {
+	padding: 0;
+	border: none;
+}
+
+.nfo-group-cell {
+	background: var(--background-secondary);
+}
+
+.nfo-group-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	cursor: pointer;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.nfo-group-bar:hover {
+	background: var(--background-modifier-hover);
+}
+
+.nfo-group-twisty {
+	display: flex;
+	align-items: center;
+	color: var(--text-muted);
+}
+
+.nfo-group-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-group-calc {
+	margin-left: auto;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.nfo-group-calc + .nfo-group-calc {
+	margin-left: 14px;
+}

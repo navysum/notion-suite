@@ -200,6 +200,7 @@ export class InsertViewModal extends Modal {
 	private viewType: ViewType = "table";
 	private groupBy = "";
 	private dateProperty = "";
+	private dateBuckets = false;
 	private filter = "";
 	private sort = "";
 	private title = "";
@@ -228,6 +229,7 @@ export class InsertViewModal extends Modal {
 		this.schema = this.store.get(config.databaseId) ?? null;
 		this.viewType = config.type;
 		this.groupBy = config.groupBy ?? "";
+		this.dateBuckets = config.dateBuckets ?? false;
 		this.dateProperty = config.dateProperty ?? "";
 		this.filter = filterToText(config.filter);
 		this.sort = (config.sorts ?? [])
@@ -319,6 +321,36 @@ export class InsertViewModal extends Modal {
 					for (const prop of groupable) dropdown.addOption(prop.id, prop.name);
 					dropdown.setValue(this.groupBy).onChange((value) => (this.groupBy = value));
 				});
+		}
+
+		if (this.viewType === "table") {
+			// Grouping a table is optional, unlike a board, so "no grouping"
+			// has to be a real choice rather than the absence of one.
+			const groupable = schema.properties.filter((p) =>
+				["status", "select", "multiselect", "checkbox", "date", "person"].includes(p.type)
+			);
+			new Setting(parent)
+				.setName("Group by")
+				.setDesc("Splits the table into foldable bands, each with its own totals.")
+				.addDropdown((dropdown) => {
+					dropdown.addOption("", "No grouping");
+					for (const prop of groupable) dropdown.addOption(prop.id, prop.name);
+					dropdown.setValue(this.groupBy).onChange((value) => {
+						this.groupBy = value;
+						parent.empty();
+						this.renderOptions(parent);
+					});
+				});
+
+			const grouped = schema.properties.find((p) => p.id === this.groupBy);
+			if (grouped && ["date", "created", "updated"].includes(grouped.type)) {
+				new Setting(parent)
+					.setName("Bucket the dates")
+					.setDesc("Overdue, today, this week, later — rather than one band per day.")
+					.addToggle((toggle) =>
+						toggle.setValue(this.dateBuckets).onChange((value) => (this.dateBuckets = value))
+					);
+			}
 		}
 
 		if (this.viewType === "calendar") {
@@ -427,7 +459,10 @@ export class InsertViewModal extends Modal {
 		const schema = this.schema;
 		if (!schema) return "";
 		const lines = [`database: ${schema.name}`, `view: ${this.viewType}`];
-		if (this.viewType === "board" && this.groupBy) lines.push(`group: ${this.groupBy}`);
+		if ((this.viewType === "board" || this.viewType === "table") && this.groupBy) {
+			lines.push(`group: ${this.groupBy}`);
+			if (this.viewType === "table" && this.dateBuckets) lines.push("buckets: true");
+		}
 		if (this.viewType === "calendar" && this.dateProperty) lines.push(`date: ${this.dateProperty}`);
 		if (this.viewType === "timeline") {
 			if (this.timelineStart) lines.push(`start: ${this.timelineStart}`);
