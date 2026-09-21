@@ -1703,3 +1703,99 @@ body.nfo-typography hr {
 .nfo-relation-empty {
 	border-top: none;
 }
+
+/* Building a filter by clicking rather than by typing. */
+.nfo-filter-builder {
+	margin: 2px 0 14px;
+}
+
+.nfo-filter-conj {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 8px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-filter-conj-btn {
+	cursor: pointer;
+	padding: 1px 9px;
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.nfo-filter-conj-on {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.nfo-filter-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+}
+
+.nfo-filter-row select,
+.nfo-filter-row input {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-filter-prop {
+	max-width: 34%;
+}
+
+.nfo-filter-remove {
+	cursor: pointer;
+	color: var(--text-faint);
+	display: flex;
+	align-items: center;
+}
+
+.nfo-filter-remove:hover {
+	color: var(--text-error);
+}
+
+.nfo-filter-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	padding: 3px 0;
+}
+
+.nfo-filter-add:hover {
+	color: var(--text-normal);
+}
+
+.nfo-filter-empty {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	padding: 2px 0 6px;
+}
+
+.nfo-filter-nested {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	margin-bottom: 6px;
+}
+
+.nfo-filter-link {
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.nfo-filter-text {
+	width: 100%;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+}

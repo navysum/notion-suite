@@ -14,6 +14,7 @@ import { buildChartData } from "../charts/aggregate";
 import { renderChart } from "../charts/svg";
 import { fence } from "../views/blockEdit";
 import { DatabaseTemplate, databaseTemplates } from "./templates";
+import { FilterBuilder, SortBuilder } from "./filterBuilder";
 
 /** Pick a database from the ones defined in the vault. */
 export class DatabasePickerModal extends FuzzySuggestModal<DatabaseSchema> {
@@ -384,22 +385,15 @@ export class InsertViewModal extends Modal {
 			});
 		}
 
-		new Setting(parent)
-			.setName("Filter")
-			.setDesc('Plain English, one per line — e.g. "Status is not Done".')
-			.addTextArea((area) =>
-				area
-					.setValue(this.filter)
-					.setPlaceholder("Status is not Done")
-					.onChange((value) => (this.filter = value))
-			);
+		new Setting(parent).setName("Filter").setHeading();
+		new FilterBuilder(parent.createDiv(), schema, this.filter, (text) => {
+			this.filter = text;
+		});
 
-		new Setting(parent)
-			.setName("Sort")
-			.setDesc('e.g. "Due asc" or "-Priority". One per line for tie-breaking.')
-			.addTextArea((area) =>
-				area.setValue(this.sort).setPlaceholder("Due asc").onChange((value) => (this.sort = value))
-			);
+		new Setting(parent).setName("Sort").setHeading();
+		new SortBuilder(parent.createDiv(), schema, this.sort, (text) => {
+			this.sort = text;
+		});
 
 		new Setting(parent)
 			.setName("Show properties")
@@ -717,18 +711,11 @@ export class InsertChartModal extends Modal {
 				);
 		}
 
-		new Setting(parent)
-			.setName("Filter")
-			.setDesc('Plain English, one per line — e.g. "Status is not Done".')
-			.addTextArea((area) =>
-				area
-					.setValue(this.filterText)
-					.setPlaceholder("Status is not Done")
-					.onChange((value) => {
-						this.filterText = value;
-						redraw();
-					})
-			);
+		new Setting(parent).setName("Filter").setHeading();
+		new FilterBuilder(parent.createDiv(), this.schema, this.filterText, (text) => {
+			this.filterText = text;
+			redraw();
+		});
 
 		new Setting(parent).setName("Order").addDropdown((dropdown) => {
 			dropdown.addOption("value_desc", "Largest first");
