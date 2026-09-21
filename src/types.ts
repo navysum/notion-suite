@@ -363,6 +363,14 @@ export interface DatabaseRow {
 	values: Record<string, unknown>;
 	ctime: number;
 	mtime: number;
+	/**
+	 * The note's own `icon:` emoji, if it sets one.
+	 *
+	 * Notion shows a page's icon everywhere that page appears -- on the card,
+	 * in the table, in the sidebar -- and a board of identical grey cards is
+	 * much harder to scan than one you can recognise at a glance.
+	 */
+	icon?: string;
 	/** How deep this row sits under its parents, when sub-items are in use. */
 	depth?: number;
 	/** Whether any row names this one as its parent. */

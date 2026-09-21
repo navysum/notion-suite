@@ -2,7 +2,7 @@ import { setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
 import { formatValue, isEmpty } from "../db/value";
-import { autoColor, pill } from "../utils/dom";
+import { autoColor, pill, rowIcon } from "../utils/dom";
 import { createInlineRow, renderTemplatePicker } from "./table";
 
 export function renderList(
@@ -35,6 +35,7 @@ export function renderList(
 			setIcon(item.createSpan({ cls: "nfo-list-bullet" }), "file-text");
 		}
 
+		rowIcon(item, row.icon);
 		const title = item.createSpan({ cls: "nfo-row-title", text: row.name });
 		title.addEventListener("click", (evt) => openRow(ctx, row.path, evt));
 
