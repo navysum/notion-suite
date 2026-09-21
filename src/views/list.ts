@@ -1,6 +1,6 @@
 import { setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
-import { ViewContext, openRow, rowContextMenu } from "./context";
+import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill } from "../utils/dom";
 import { createInlineRow, renderTemplatePicker } from "./table";
@@ -24,9 +24,11 @@ export function renderList(
 			const box = item.createEl("input", { type: "checkbox", cls: "nfo-list-check" });
 			box.checked = !!row.values[checkbox.id];
 			box.addEventListener("change", () => {
-				void ctx.store
-					.setValue(ctx.schema, row.path, checkbox.id, box.checked)
-					.then(() => ctx.refresh());
+				runWrite(
+					ctx,
+					`set ${checkbox.name}`,
+					ctx.store.setValue(ctx.schema, row.path, checkbox.id, box.checked)
+				);
 			});
 			if (box.checked) item.addClass("nfo-list-done");
 		} else {

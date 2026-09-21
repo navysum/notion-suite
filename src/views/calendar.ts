@@ -6,6 +6,7 @@ import { findProperty } from "../db/query";
 import { autoColor } from "../utils/dom";
 import { asText } from "../utils/text";
 import { SurfaceState } from "./viewState";
+import { runDetached } from "../utils/async";
 
 export function renderCalendar(
 	container: HTMLElement,
@@ -93,14 +94,14 @@ export function renderCalendar(
 		setIcon(addBtn, "plus");
 		addBtn.addEventListener("click", (evt) => {
 			evt.stopPropagation();
-			void (async () => {
+			runDetached("add a row", async () => {
 				const file = await ctx.store.createRow(ctx.schema, "Untitled", {
 					[dateProp.id]: toISODate(day),
 				});
 				// Stay on the calendar, as everywhere else.
 				if (file) await ctx.app.workspace.getLeaf(false).openFile(file);
 				ctx.refresh();
-			})();
+			});
 		});
 
 		for (const row of byDay.get(toISODate(day)) ?? []) {

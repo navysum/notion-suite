@@ -1,3 +1,5 @@
+import { calendarDate, toISODate } from "./dates";
+
 /**
  * Coerce an unknown value into display text.
  *
@@ -12,7 +14,10 @@ export function asText(value: unknown): string {
 	if (value === null || value === undefined) return "";
 	if (typeof value === "string") return value;
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
-	if (value instanceof Date) return value.toISOString().slice(0, 10);
+	// The calendar day that was written down, not the UTC instant: see
+	// calendarDate. toISOString() here shifted every date a day early west of
+	// Greenwich, including the value handed to the date picker.
+	if (value instanceof Date) return toISODate(calendarDate(value));
 	if (Array.isArray(value)) {
 		return (value as unknown[]).map(asText).filter((part) => part.length > 0).join(", ");
 	}
@@ -22,4 +27,25 @@ export function asText(value: unknown): string {
 /** Lower-cased `asText`, for the many case-insensitive comparisons. */
 export function asKey(value: unknown): string {
 	return asText(value).toLowerCase();
+}
+
+/**
+ * Strip a wikilink down to the note title it points at.
+ *
+ * Relations, parent links and cover images all store a note's title, and a
+ * human may write that as `Note`, `[[Note]]`, `[[Note|an alias]]` or
+ * `[[Note#A heading]]`. Every one of those means the same note.
+ *
+ * This lived in three places -- the sub-item tree, relation resolution and the
+ * page banner -- each with its own copy. Rename handling needs a fourth reader,
+ * and a fourth copy is how the copies start to disagree.
+ */
+export function linkTarget(value: unknown): string {
+	const raw = Array.isArray(value) ? (value as unknown[])[0] : value;
+	return asText(raw)
+		.replace(/^!?\[\[/, "")
+		.replace(/\]\]$/, "")
+		.split("|")[0]
+		.split("#")[0]
+		.trim();
 }

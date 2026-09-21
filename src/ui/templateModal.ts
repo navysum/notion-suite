@@ -2,6 +2,7 @@ import { App, Modal, Notice, Setting } from "obsidian";
 import { DatabaseStore, makeId } from "../db/store";
 import { DatabaseSchema, DatabaseRow, RowTemplate } from "../types";
 import { DERIVED_TYPES } from "../db/store";
+import { runDetached } from "../utils/async";
 
 /**
  * Save an existing row as a reusable template.
@@ -117,7 +118,7 @@ export class ManageTemplatesModal extends Modal {
 						.setButtonText("Delete")
 						.setDestructive()
 						.onClick(() => {
-							void (async () => {
+							runDetached("delete that template", async () => {
 								await this.store.updateDatabase(this.schema.id, (schema) => {
 									schema.rowTemplates = (schema.rowTemplates ?? []).filter(
 										(t) => t.id !== template.id
@@ -125,7 +126,7 @@ export class ManageTemplatesModal extends Modal {
 								});
 								this.onChanged();
 								this.render();
-							})();
+							});
 						})
 				);
 		}

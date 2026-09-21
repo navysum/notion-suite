@@ -123,3 +123,53 @@ test("rollup aggregation is not reimplemented", () => {
 		`Call collapse()/gatherValues() from db/rollup.ts rather than reimplementing them: ${offenders.join(", ")}`
 	);
 });
+
+/**
+ * Bug class: a write that cannot be awaited, failing into nowhere.
+ *
+ * Click handlers return immediately, so every write the UI performs runs
+ * detached. Twenty-two of them had no error handling at all: a read-only note, a
+ * row deleted since the view drew it, or a vault mid-sync left the old value on
+ * screen as though the click had never happened, with the only trace an
+ * unhandled rejection in a console nobody had open.
+ *
+ * Detached work goes through `runWrite` or `runDetached`, both of which report.
+ */
+test("no detached work fails silently", () => {
+	const offenders: string[] = [];
+	for (const [file, text] of sources) {
+		const lines = text.split("\n");
+		lines.forEach((line, i) => {
+			if (!/\bvoid\s+(\(async|[\w.]*\b(store|app|vault|fileManager)\b)/.test(line)) return;
+			// A `.catch` within a few lines is handling it the long way round,
+			// which is fine -- the point is that something handles it.
+			const window = lines.slice(i, i + 12).join("\n");
+			if (/\.catch\(/.test(window)) return;
+			// Opening a file is Obsidian's own navigation, not our write.
+			if (/openFile\(|openLinkText\(|revealLeaf\(|setViewState\(/.test(line)) return;
+			offenders.push(`${file}:${i + 1}`);
+		});
+	}
+	assert.deepEqual(
+		offenders,
+		[],
+		`Route these through runWrite/runDetached so a failure is visible:\n${offenders.join("\n")}`
+	);
+});
+
+/**
+ * The README promises that nothing leaves the machine. A cover set to an
+ * http(s) address broke that promise quietly -- opening the note told that
+ * server your IP and the time. It is now a setting, off by default, and this
+ * guard keeps any new request from slipping in unannounced.
+ */
+test("nothing reaches the network without a setting behind it", () => {
+	const offenders: string[] = [];
+	for (const [file, text] of sources) {
+		text.split("\n").forEach((line, i) => {
+			if (!/\b(fetch|XMLHttpRequest|requestUrl|WebSocket|EventSource)\s*\(/.test(line)) return;
+			offenders.push(`${file}:${i + 1}`);
+		});
+	}
+	assert.deepEqual(offenders, [], `Network calls: ${offenders.join(", ")}`);
+});

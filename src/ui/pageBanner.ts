@@ -1,4 +1,5 @@
 import { App, MarkdownView, Plugin, TFile } from "obsidian";
+import { linkTarget } from "../utils/text";
 
 /**
  * Page icons and covers.
@@ -13,18 +14,28 @@ const BANNER_CLASS = "nfo-banner";
 const ICON_CLASS = "nfo-page-emoji";
 
 export interface BannerSettings {
+	/** Whether a cover set to an http(s) URL may be fetched. */
+	allowRemoteCovers: boolean;
 	showBanners: boolean;
 	bannerHeight: number;
 }
 
 /** Resolve a cover value to something an <img> can load. */
-function coverSource(app: App, value: unknown, sourcePath: string): string | null {
+function coverSource(
+	app: App,
+	value: unknown,
+	sourcePath: string,
+	allowRemote: boolean
+): string | null {
 	if (typeof value !== "string") return null;
 	const text = value.trim();
 	if (!text) return null;
-	if (/^https?:\/\//.test(text)) return text;
+	// Fetching a cover from the web hands that server the reader's IP address
+	// and the moment they opened the note. Everything else this plugin does
+	// stays on the machine, so this asks first rather than assuming.
+	if (/^https?:\/\//.test(text)) return allowRemote ? text : null;
 
-	const linkText = text.replace(/^!?\[\[/, "").replace(/\]\]$/, "").split("|")[0];
+	const linkText = linkTarget(text);
 	const file = app.metadataCache.getFirstLinkpathDest(linkText, sourcePath);
 	return file ? app.vault.getResourcePath(file) : null;
 }
@@ -47,7 +58,12 @@ export function applyBanner(app: App, view: MarkdownView, settings: BannerSettin
 	const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
 	if (!frontmatter) return;
 
-	const cover = coverSource(app, frontmatter.cover ?? frontmatter.banner, file.path);
+	const cover = coverSource(
+		app,
+		frontmatter.cover ?? frontmatter.banner,
+		file.path,
+		settings.allowRemoteCovers
+	);
 	const icon = typeof frontmatter.icon === "string" ? frontmatter.icon.trim() : "";
 	if (!cover && !icon) return;
 

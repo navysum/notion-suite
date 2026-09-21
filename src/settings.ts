@@ -8,6 +8,7 @@ import {
 import type NotionForObsidian from "./main";
 import { DatabaseSchema } from "./types";
 import { ImportFolderModal } from "./ui/modals";
+import { runDetached } from "./utils/async";
 
 export interface NotionSettings {
 	enableSlashMenu: boolean;
@@ -17,6 +18,8 @@ export interface NotionSettings {
 	sidePeek: boolean;
 	openSidebarOnStart: boolean;
 	showBanners: boolean;
+	/** Allow a cover set to an http(s) URL to be fetched. Off by default. */
+	allowRemoteCovers: boolean;
 	bannerHeight: number;
 	compactRows: boolean;
 	showRowNumbers: boolean;
@@ -31,6 +34,7 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	sidePeek: true,
 	openSidebarOnStart: true,
 	showBanners: true,
+	allowRemoteCovers: false,
 	bannerHeight: 180,
 	compactRows: false,
 	showRowNumbers: false,
@@ -102,6 +106,16 @@ export class NotionSettingTab extends PluginSettingTab {
 						desc: "Show an emoji and a banner image at the top of notes that set them in frontmatter.",
 						aliases: ["banner", "emoji", "header", "cover", "image"],
 						control: { type: "toggle", key: "showBanners", defaultValue: true },
+					},
+					{
+						name: "Load covers from the web",
+						desc:
+							"A cover set to an http(s) address is fetched from that server, which tells " +
+							"it your IP address and when you opened the note. Off by default: everything " +
+							"else this plugin does stays on your machine. Covers stored in your vault " +
+							"always work.",
+						aliases: ["remote", "network", "internet", "url", "privacy", "image"],
+						control: { type: "toggle", key: "allowRemoteCovers", defaultValue: false },
 					},
 					{
 						name: "Cover height",
@@ -192,14 +206,14 @@ export class NotionSettingTab extends PluginSettingTab {
 			onDelete: (index: number) => {
 				const schema = databases[index];
 				if (!schema) return;
-				void (async () => {
+				runDetached("remove that database", async () => {
 					// Only the schema is forgotten; the notes stay where they are.
 					await this.plugin.store.deleteDatabase(schema.id);
 					new Notice(
 						`Removed the “${schema.name}” database definition. Your notes are untouched.`
 					);
 					this.update();
-				})();
+				});
 			},
 			items: databases.map((schema) => ({
 				name: `${schema.icon ?? "🗂️"} ${schema.name}`,

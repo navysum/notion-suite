@@ -1659,3 +1659,47 @@ body.nfo-typography hr {
 	background: transparent;
 	color: var(--text-muted);
 }
+
+/* The relation picker: a searchable, uncapped list of rows to link to. */
+.nfo-relation-modal .nfo-relation-list {
+	max-height: 340px;
+	overflow-y: auto;
+	margin: 4px 0 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+}
+
+.nfo-relation-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	cursor: pointer;
+}
+
+.nfo-relation-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.nfo-relation-on {
+	background: var(--background-modifier-active-hover);
+}
+
+.nfo-relation-name {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nfo-relation-count,
+.nfo-relation-empty {
+	padding: 8px 10px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.nfo-relation-empty {
+	border-top: none;
+}

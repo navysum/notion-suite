@@ -47,7 +47,6 @@ export function renderTableOfContents(
 
 /** ```notion-breadcrumb — the folder trail leading to this note. */
 export function renderBreadcrumb(
-	app: App,
 	container: HTMLElement,
 	ctx: MarkdownPostProcessorContext
 ): void {
@@ -72,5 +71,4 @@ export function renderBreadcrumb(
 		cls: "nfo-crumb nfo-crumb-current",
 		text: fileName.replace(/\.md$/, ""),
 	});
-	void app;
 }

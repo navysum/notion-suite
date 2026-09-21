@@ -10,7 +10,9 @@ import { filterToText, ruleToText } from "../src/views/config";
 import { spliceLines, setBlockKey, fence } from "../src/views/blockEdit";
 import { isFilterGroup } from "../src/types";
 import { formatUniqueId } from "../src/db/store";
-import { calendarGrid, parseDate, toISODate } from "../src/utils/dates";
+import { calendarGrid, formatDate, parseDate, toISODate } from "../src/utils/dates";
+import { asText } from "../src/utils/text";
+import { dateBucket } from "../src/db/query";
 import { DatabaseRow, DatabaseSchema, PropertyDef } from "../src/types";
 
 const schema: DatabaseSchema = {
@@ -590,4 +592,49 @@ test("calendarGrid always returns six aligned weeks", () => {
 	assert.equal(grid.length, 42);
 	assert.equal(grid[0].getDay(), 0);
 	assert.ok(grid.some((d) => d.getMonth() === 1 && d.getDate() === 1));
+});
+
+/* --------------------------------------------------------- calendar dates */
+
+/**
+ * A date-only YAML value parses to midnight UTC. Reading it back with the local
+ * getters showed the day before for everyone west of Greenwich: a task due on
+ * the 14th read as the 13th and sat in Overdue. These run under a fixed TZ so
+ * the failure is reproducible rather than dependent on where the test runs.
+ */
+function inZone<T>(zone: string, run: () => T): T {
+	const previous = process.env.TZ;
+	process.env.TZ = zone;
+	try {
+		return run();
+	} finally {
+		if (previous === undefined) delete process.env.TZ;
+		else process.env.TZ = previous;
+	}
+}
+
+const yamlDate = () => new Date("2026-03-14T00:00:00.000Z");
+
+for (const zone of ["Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"]) {
+	test(`a date-only value keeps its day in ${zone}`, () => {
+		inZone(zone, () => {
+			assert.equal(toISODate(parseDate(yamlDate())!), "2026-03-14");
+			assert.equal(asText(yamlDate()), "2026-03-14");
+			assert.match(formatDate(yamlDate()), /Mar 14, 2026/);
+		});
+	});
+}
+
+test("a date that is due today is not overdue, wherever you are", () => {
+	for (const zone of ["Europe/London", "America/Los_Angeles", "Pacific/Auckland"]) {
+		inZone(zone, () => {
+			assert.equal(dateBucket(yamlDate(), new Date(2026, 2, 14)), "Today", zone);
+		});
+	}
+});
+
+/** A real timestamp is a moment, not a calendar day, and stays local. */
+test("a value with a time on it is left alone", () => {
+	const instant = new Date("2026-03-14T15:30:00.000Z");
+	assert.equal(parseDate(instant)?.getTime(), instant.getTime());
 });

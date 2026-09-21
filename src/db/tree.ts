@@ -1,5 +1,5 @@
 import { DatabaseRow, DatabaseSchema } from "../types";
-import { asKey } from "../utils/text";
+import { linkTarget } from "../utils/text";
 
 /**
  * Sub-items: rows that name another row as their parent.
@@ -9,17 +9,6 @@ import { asKey } from "../utils/text";
  * plugin state. Everything here works on already-filtered rows, so a view's
  * filter still decides what is on screen.
  */
-
-/** Strip a wikilink down to the note title it points at. */
-function linkTarget(value: unknown): string {
-	const raw = Array.isArray(value) ? (value as unknown[])[0] : value;
-	return asKey(raw)
-		.replace(/^!?\[\[/, "")
-		.replace(/\]\]$/, "")
-		.split("|")[0]
-		.split("#")[0]
-		.trim();
-}
 
 export interface TreeRow {
 	row: DatabaseRow;

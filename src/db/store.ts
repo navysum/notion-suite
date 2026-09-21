@@ -11,6 +11,7 @@ import {
 import { coerce } from "./value";
 import { RowResolver } from "./resolve";
 import { autoColor } from "../utils/dom";
+import { asText, linkTarget } from "../utils/text";
 
 /** Property types whose value is computed on read and never stored in a note. */
 export const DERIVED_TYPES: PropertyType[] = ["formula", "rollup", "created", "updated"];
@@ -97,6 +98,54 @@ export function makeId(prefix: string): string {
 /** Characters Obsidian refuses in file names. */
 function sanitizeFileName(name: string): string {
 	return name.replace(/[\\/:*?"<>|#^[\]]/g, "").trim() || "Untitled";
+}
+
+export interface RenameSucceeded {
+	ok: true;
+	path: string;
+}
+
+export interface RenameRefused {
+	ok: false;
+	reason: string;
+}
+
+export type RenameResult = RenameSucceeded | RenameRefused;
+
+/** The properties of a schema that hold another row's title. */
+function referenceKeys(schema: DatabaseSchema): string[] {
+	const keys = schema.properties.filter((p) => p.type === "relation").map((p) => p.id);
+	if (schema.parentProperty && !keys.includes(schema.parentProperty)) {
+		keys.push(schema.parentProperty);
+	}
+	return keys;
+}
+
+/** Does this frontmatter value point at the given title? */
+function mentions(value: unknown, needle: string): boolean {
+	if (value === null || value === undefined) return false;
+	const entries = Array.isArray(value) ? (value as unknown[]) : [value];
+	return entries.some((entry) => linkTarget(entry).toLowerCase() === needle);
+}
+
+/**
+ * Rewrite references to `needle` as `to`, preserving how each one was written.
+ *
+ * A value stored as `[[Old]]` comes back as `[[New]]`; a bare `Old` comes back
+ * as a bare `New`. Rewriting the shape as well as the name would quietly change
+ * whether Obsidian sees a link there.
+ */
+function repoint(value: unknown, needle: string, to: string): unknown {
+	const one = (entry: unknown): unknown => {
+		const text = asText(entry);
+		if (linkTarget(entry).toLowerCase() !== needle) return entry;
+		const wiki = text.match(/^(!?\[\[)([^\]|#]+)(.*)$/);
+		if (!wiki) return to;
+		// Keep an alias or heading exactly as it was; only the target moves.
+		return `${wiki[1]}${to}${wiki[3]}`;
+	};
+	if (Array.isArray(value)) return (value as unknown[]).map(one);
+	return one(value);
 }
 
 /**
@@ -310,14 +359,82 @@ export class DatabaseStore extends Events {
 		this.invalidate();
 	}
 
-	async renameRow(rowPath: string, newName: string): Promise<void> {
+	/**
+	 * Rename a row, saying what happened.
+	 *
+	 * This used to return silently when the new name was taken, so the title
+	 * snapped back with no explanation and no way to tell a refusal from a
+	 * failure. Callers now get a reason they can show.
+	 */
+	async renameRow(rowPath: string, newName: string): Promise<RenameResult> {
 		const file = this.getFile(rowPath);
-		if (!file) return;
+		if (!file) return { ok: false, reason: "That note no longer exists." };
+
 		const clean = sanitizeFileName(newName);
-		if (!clean || clean === file.basename) return;
+		if (!clean) return { ok: false, reason: "A row needs a name." };
+		if (clean === file.basename) return { ok: true, path: file.path };
+
+		if (clean !== newName.trim()) {
+			// Obsidian refuses these outright, so say so rather than silently
+			// renaming to something the user did not type.
+			const stripped = newName.trim();
+			if (!clean) return { ok: false, reason: `“${stripped}” is not a usable file name.` };
+		}
+
 		const target = normalizePath(`${file.parent?.path ?? ""}/${clean}.md`).replace(/^\/+/, "");
-		if (this.app.vault.getAbstractFileByPath(target)) return;
+		if (this.app.vault.getAbstractFileByPath(target)) {
+			return { ok: false, reason: `A row called “${clean}” already exists here.` };
+		}
+
 		await this.app.fileManager.renameFile(file, target);
+		this.invalidate();
+		return { ok: true, path: target };
+	}
+
+	/**
+	 * Repoint every relation and parent link at a row that has just been renamed.
+	 *
+	 * Relations and sub-item links hold a note's **title**, because a title is
+	 * what survives a vault sync and what a human would type. The cost is that
+	 * renaming a row breaks every link into it: Obsidian rewrites `[[wikilinks]]`
+	 * on rename, but a bare title is just a string it has no reason to touch. The
+	 * link did not error -- it stopped matching, silently, and the sub-items
+	 * quietly became top-level rows.
+	 *
+	 * This runs off the vault's own rename event, so it covers renames made in
+	 * the file explorer or by another plugin, not only the ones we perform.
+	 */
+	async relinkRenamed(oldPath: string, newPath: string): Promise<void> {
+		const basename = (path: string) => path.split("/").pop()?.replace(/\.md$/, "") ?? "";
+		const from = basename(oldPath);
+		const to = basename(newPath);
+		if (!from || !to || from === to) return;
+
+		const needle = from.toLowerCase();
+
+		for (const schema of this.schemas) {
+			const keys = referenceKeys(schema);
+			if (keys.length === 0) continue;
+
+			for (const file of this.folderFiles(schema.folder)) {
+				const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter as
+					| Record<string, unknown>
+					| undefined;
+				if (!frontmatter) continue;
+				// Check the in-memory cache before touching the disk: on a large
+				// vault most notes reference nothing that was renamed.
+				if (!keys.some((key) => mentions(frontmatter[key], needle))) continue;
+
+				await this.app.fileManager.processFrontMatter(
+					file,
+					(target: Record<string, unknown>) => {
+						for (const key of keys) {
+							target[key] = repoint(target[key], needle, to);
+						}
+					}
+				);
+			}
+		}
 		this.invalidate();
 	}
 

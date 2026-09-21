@@ -1,7 +1,7 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import { DatabaseRow, PropertyDef, ViewConfig } from "../types";
 import { renderCell } from "./cells";
-import { ViewContext, openRow, rowContextMenu } from "./context";
+import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
 import { findProperty } from "../db/query";
 import {
 	calculateColumn,
@@ -16,6 +16,7 @@ import { BulkValueModal } from "../ui/bulkModal";
 import { PropertyModal } from "../ui/propertyModal";
 import { ManageTemplatesModal } from "../ui/templateModal";
 import { choose, confirm } from "../ui/confirmModal";
+import { runDetached } from "../utils/async";
 
 export function renderTable(
 	container: HTMLElement,
@@ -390,13 +391,26 @@ async function deleteSelected(
 /** Ask for one value, then write it to every selected row. */
 function promptBulkValue(ctx: ViewContext, rows: DatabaseRow[], prop: PropertyDef): void {
 	const apply = (value: unknown): void => {
-		void (async () => {
-			for (const row of rows) {
-				await ctx.store.setValue(ctx.schema, row.path, prop.id, value);
+		runDetached(`set ${prop.name}`, async () => {
+			let done = 0;
+			try {
+				for (const row of rows) {
+					await ctx.store.setValue(ctx.schema, row.path, prop.id, value);
+					done++;
+				}
+			} finally {
+				// Say how far it got either way: a bulk edit that stops half way
+				// through has still changed real notes, and silence about that
+				// leaves the user with no idea what state they are in.
+				const all = done === rows.length;
+				new Notice(
+					all
+						? `Set ${prop.name} on ${done} ${done === 1 ? "row" : "rows"}.`
+						: `Set ${prop.name} on ${done} of ${rows.length} rows before stopping.`
+				);
+				ctx.refresh();
 			}
-			new Notice(`Set ${prop.name} on ${rows.length} ${rows.length === 1 ? "row" : "rows"}.`);
-			ctx.refresh();
-		})();
+		});
 	};
 
 	if (prop.type === "checkbox") {
@@ -453,7 +467,17 @@ function renderTitleCell(
 			title.show();
 			const next = input.value.trim();
 			if (!save || !next || next === row.name) return;
-			void ctx.store.renameRow(row.path, next).then(() => ctx.refresh());
+			void ctx.store
+				.renameRow(row.path, next)
+				.then((result) => {
+					if (!result.ok) new Notice(result.reason);
+					ctx.refresh();
+				})
+				.catch((error: unknown) => {
+					console.error("Notion Suite: renaming a row failed", error);
+					new Notice("Could not rename that row.");
+					ctx.refresh();
+				});
 		};
 
 		input.addEventListener("blur", () => finish(true));
@@ -547,11 +571,14 @@ function propertyMenu(
 			.setTitle("Hide property")
 			.setIcon("eye-off")
 			.onClick(() => {
-				void ctx.store.updateDatabase(ctx.schema.id, (schema) => {
-					const target = schema.properties.find((p) => p.id === prop.id);
-					if (target) target.hidden = true;
-				});
-				ctx.refresh();
+				runWrite(
+					ctx,
+					"hide that property",
+					ctx.store.updateDatabase(ctx.schema.id, (schema) => {
+						const target = schema.properties.find((p) => p.id === prop.id);
+						if (target) target.hidden = true;
+					})
+				);
 			})
 	);
 	menu.showAtMouseEvent(evt);
