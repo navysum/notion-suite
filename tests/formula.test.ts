@@ -291,6 +291,10 @@ test("dateBetween is first argument minus second", () => {
 	assert.equal(f('dateBetween("2026-03-05T12:00", "2026-03-05T09:30", "hours")'), 2);
 	assert.equal(f('dateBetween("2026-03-05T12:00", "2026-03-05T09:30", "minutes")'), 150);
 	assert.equal(f('dateBetween("2026-03-10", "2026-03-05", "day")'), 5, "singular units are accepted");
+	// The spans above cross America's daylight-saving change on 8 March; these
+	// cross Europe's on 29 March. Either way they are an hour short of whole days.
+	assert.equal(f('dateBetween("2026-04-01", "2026-03-27", "days")'), 5, "across a DST change");
+	assert.equal(f('dateBetween("2026-04-09", "2026-03-26", "weeks")'), 2, "across a DST change");
 	assert.equal(f('dateBetween({Due}, "2026-03-01", "days")'), 4);
 	assert.equal(f('dateBetween("2026-03-10", "2026-03-05", "fortnights")'), null);
 	assert.equal(f('dateBetween("nope", "2026-03-05", "days")'), null);

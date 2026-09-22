@@ -27,6 +27,20 @@ The real cause of the collapsed table, found in a pull request against 1.7.0.
   again. Nothing caught this for eight releases because the unit tests never
   laid out a page.
 
+- **`dateBetween` came up a day short across a clock change.** Days and weeks
+  were counted as elapsed time, and a span over a daylight-saving change is an
+  hour short of whole days, so `dateBetween("2026-03-10", "2026-03-05", "days")`
+  was 4 in New York. Days and weeks are now counted on the calendar; hours and
+  minutes are still elapsed time.
+
+### Changed
+
+- **The test suite runs in three time zones** -- UTC, New York and Berlin, plus
+  whatever `TZ` you run it with. West and east of UTC break dates in opposite
+  directions, so a suite that only runs in its author's zone passes one of them
+  by luck. It did: the 1.7.0 suite failed in New York on the bug above, and in
+  Berlin on a test that built local midnight and printed it as UTC.
+
 ## 1.7.1
 
 Three things found by using it on a real vault.

@@ -409,8 +409,10 @@ test("min, max and range survive a gather too large to spread as arguments", () 
 	assert.equal(collapse(many, many.length, "max"), 199_999);
 	assert.equal(collapse(many, many.length, "range"), 199_999);
 
+	// Built in UTC because toISOString() prints UTC: local midnight printed as
+	// UTC is the previous day anywhere east of Greenwich.
 	const dates = Array.from({ length: 200_000 }, (_unused, i) =>
-		new Date(2020, 0, 1 + (i % 365)).toISOString().slice(0, 10)
+		new Date(Date.UTC(2020, 0, 1 + (i % 365))).toISOString().slice(0, 10)
 	);
 	assert.equal(collapse(dates, dates.length, "earliest"), "2020-01-01");
 	assert.equal(collapse(dates, dates.length, "latest"), "2020-12-30");

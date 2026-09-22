@@ -431,15 +431,18 @@ function dateBetween(a: Date, b: Date, unit: DateUnit): number {
 	if (unit === "months") return monthsBetween(a, b);
 	if (unit === "years") return Math.trunc(monthsBetween(a, b) / 12);
 	const ms = a.getTime() - b.getTime();
+	// Days and weeks are counted on the wall clock. A span over a daylight-saving
+	// change is an hour short of whole days, which would truncate 5 days to 4.
+	const wallMs = ms - (a.getTimezoneOffset() - b.getTimezoneOffset()) * 60000;
 	switch (unit) {
 		case "minutes":
 			return Math.trunc(ms / 60000);
 		case "hours":
 			return Math.trunc(ms / 3600000);
 		case "weeks":
-			return Math.trunc(ms / (7 * 86400000));
+			return Math.trunc(wallMs / (7 * 86400000));
 		default:
-			return Math.trunc(ms / 86400000);
+			return Math.trunc(wallMs / 86400000);
 	}
 }
 
