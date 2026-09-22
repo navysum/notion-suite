@@ -3,6 +3,19 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- **The table view stacked every value into one column.** `renderCell` added
+  `.nfo-cell` to whatever element it was given, and that class is
+  `display: flex`. On a board card the element is a `div`, where flex is right;
+  in the table it is the `<td>` itself, and a flex `<td>` stops being a table
+  cell, so the columns collapsed. The cell layout now lives on an element
+  `renderCell` creates, and a test renders a table and fails if a `<td>` ever
+  carries `.nfo-cell` again. Found by screenshotting the real plugin: the unit
+  tests never laid out a page, so nothing caught it.
+
 ## 1.7.0
 
 Six bugs found by auditing what people are hitting now that the plugin is in
