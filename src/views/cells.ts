@@ -24,45 +24,50 @@ export function renderCell(
 	prop: PropertyDef
 ): void {
 	container.empty();
-	container.addClass("nfo-cell");
-	container.addClass(`nfo-cell-${prop.type}`);
+	// The cell layout belongs to an element this function owns. It used to sit on
+	// `container` itself, which in the table view is the <td>: `.nfo-cell` is
+	// `display: flex`, and a flex <td> stops being a table cell, so every value
+	// stacked into a single column.
+	const cell = container.createDiv();
+	cell.addClass("nfo-cell");
+	cell.addClass(`nfo-cell-${prop.type}`);
 	const value = row.values[prop.id];
 
 	if (READ_ONLY.includes(prop.type)) {
-		container.addClass("nfo-cell-readonly");
+		cell.addClass("nfo-cell-readonly");
 		const text = formatValue(prop, value);
-		container.createSpan({ text: text || "—" });
+		cell.createSpan({ text: text || "—" });
 		return;
 	}
 
 	switch (prop.type) {
 		case "checkbox":
-			renderCheckbox(container, ctx, row, prop, value);
+			renderCheckbox(cell, ctx, row, prop, value);
 			break;
 		case "select":
 		case "status":
-			renderSelect(container, ctx, row, prop, value);
+			renderSelect(cell, ctx, row, prop, value);
 			break;
 		case "multiselect":
 		case "person":
-			renderMultiSelect(container, ctx, row, prop, value);
+			renderMultiSelect(cell, ctx, row, prop, value);
 			break;
 		case "date":
-			renderDate(container, ctx, row, prop, value);
+			renderDate(cell, ctx, row, prop, value);
 			break;
 		case "number":
-			renderInput(container, ctx, row, prop, value, "number");
+			renderInput(cell, ctx, row, prop, value, "number");
 			break;
 		case "url":
 		case "email":
 		case "phone":
-			renderLinkish(container, ctx, row, prop, value);
+			renderLinkish(cell, ctx, row, prop, value);
 			break;
 		case "relation":
-			renderRelation(container, ctx, row, prop, value);
+			renderRelation(cell, ctx, row, prop, value);
 			break;
 		default:
-			renderInput(container, ctx, row, prop, value, "text");
+			renderInput(cell, ctx, row, prop, value, "text");
 	}
 }
 
