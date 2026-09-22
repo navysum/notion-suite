@@ -3,6 +3,25 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- **`dateBetween` came up a day short across a clock change.** Days and weeks
+  were counted as elapsed time, and a span over a daylight-saving change is an
+  hour short of whole days, so `dateBetween("2026-03-10", "2026-03-05", "days")`
+  was 4 in New York. Days and weeks are now counted on the calendar. Hours and
+  minutes are still elapsed time.
+
+### Changed
+
+- **The test suite runs in three time zones:** UTC, New York and Berlin, plus
+  the TZ you run it with. West and east of UTC break dates in opposite
+  directions, so a suite that only runs in its author's zone passes one of them
+  by luck. It did: the 1.7.0 suite failed in New York (the bug above) and in
+  Berlin, where a test built local midnight and printed it as UTC. That test
+  now builds its dates in UTC. The rollup code was already correct.
+
 ## 1.7.0
 
 Six bugs found by auditing what people are hitting now that the plugin is in
