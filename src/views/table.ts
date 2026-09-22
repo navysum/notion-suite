@@ -165,7 +165,7 @@ function renderCalculationRow(
 			button.createSpan({ cls: "nfo-calc-name", text: calculationLabel(how) });
 			button.createSpan({
 				cls: "nfo-calc-value",
-				text: formatCalculation(how, calculateColumn(rows, prop, how)),
+				text: formatCalculation(how, calculateColumn(rows, prop, how), prop),
 			});
 		} else {
 			button.addClass("nfo-calc-empty");
@@ -251,7 +251,7 @@ function renderGroupHeader(
 		const value = calculateColumn(group.rows, prop, how);
 		bar.createSpan({
 			cls: "nfo-group-calc",
-			text: `${prop.name} ${calculationLabel(how).toLowerCase()}: ${formatCalculation(how, value)}`,
+			text: `${prop.name} ${calculationLabel(how).toLowerCase()}: ${formatCalculation(how, value, prop)}`,
 		});
 	}
 

@@ -15,7 +15,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { installDom } from "./dom";
+import { host, installDom } from "./dom";
 
 installDom();
 
@@ -243,4 +243,35 @@ test("a cover stored in the vault works with remote loading off", () => {
 test("no cover at all resolves to nothing", () => {
 	assert.equal(coverSource(vaultApp, "", "Note.md", true), null);
 	assert.equal(coverSource(vaultApp, 42, "Note.md", true), null);
+});
+
+/* ------------------------------------------- the page that said it was gone */
+
+/**
+ * A database tab restored at startup can draw before the store has finished
+ * loading. The "no longer exists" message it shows then was never cleared: the
+ * next render inserted the header *before* it and the body *after* it, so the
+ * page read as broken while being perfectly fine. Reported from a real vault.
+ */
+import { renderPageChrome } from "../src/views/databaseView";
+
+test("the 'no longer exists' message is cleared once the database is there", () => {
+	const container = host();
+
+	renderPageChrome(container, null);
+	assert.ok(container.querySelector(".nfo-page-missing"), "expected the message when it is missing");
+
+	renderPageChrome(container, { name: "Saving Goals" });
+	assert.equal(
+		container.querySelector(".nfo-page-missing"),
+		null,
+		"the message stayed on screen above a working database"
+	);
+});
+
+test("a database that goes away does say so", () => {
+	const container = host();
+	renderPageChrome(container, { name: "Saving Goals" });
+	renderPageChrome(container, null);
+	assert.ok(container.querySelector(".nfo-page-missing"));
 });

@@ -3,6 +3,7 @@ import { formatDate, parseDate, toISODate } from "../utils/dates";
 import { runFormula } from "./formula";
 import { formatUniqueId } from "./store";
 import { asText } from "../utils/text";
+import { formatCurrency } from "./currency";
 
 /**
  * Coerce a raw frontmatter value into the shape the property type expects.
@@ -67,7 +68,7 @@ export function formatValue(prop: PropertyDef, value: unknown): string {
 			const n = Number(value);
 			if (isNaN(n)) return "";
 			if (prop.numberFormat === "percent") return `${round(n * 100)}%`;
-			if (prop.numberFormat === "currency") return `$${round(n).toLocaleString()}`;
+			if (prop.numberFormat === "currency") return formatCurrency(round(n), prop.currency);
 			return String(round(n));
 		}
 		case "checkbox":
@@ -104,7 +105,7 @@ function formatRollup(prop: PropertyDef, value: unknown): string {
 		const how = prop.rollupFunction ?? "";
 		if (how.startsWith("percent_")) return `${round(value)}%`;
 		if (how === "date_range") return `${round(value)} days`;
-		if (prop.numberFormat === "currency") return `$${round(value).toLocaleString()}`;
+		if (prop.numberFormat === "currency") return formatCurrency(round(value), prop.currency);
 		return String(round(value));
 	}
 	if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDate(value);

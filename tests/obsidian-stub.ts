@@ -108,6 +108,10 @@ export class Notice {
 }
 export class TFile {}
 export class MarkdownView {}
+export class ItemView {}
+export class WorkspaceLeaf {}
+export class PluginSettingTab {}
+export class FuzzySuggestModal {}
 export class Plugin {}
 export class MarkdownRenderChild {}
 export class TFolder {}

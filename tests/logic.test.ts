@@ -85,8 +85,16 @@ test("isEmpty treats blank strings and empty lists as empty, but not false", () 
 test("formatValue renders number formats and dates", () => {
 	const percent: PropertyDef = { id: "p", name: "P", type: "number", numberFormat: "percent" };
 	assert.equal(formatValue(percent, 0.42), "42%");
-	const currency: PropertyDef = { id: "c", name: "C", type: "number", numberFormat: "currency" };
-	assert.equal(formatValue(currency, 1234.5), "$1,234.5");
+	// Pinned to a currency rather than the machine's locale, and to the full
+	// minor unit: this used to assert "$1,234.5", which is not a price.
+	const currency: PropertyDef = {
+		id: "c",
+		name: "C",
+		type: "number",
+		numberFormat: "currency",
+		currency: "USD",
+	};
+	assert.equal(formatValue(currency, 1234.5), "$1,234.50");
 	assert.equal(formatValue(schema.properties[2], "2026-01-10"), "Jan 10, 2026");
 	assert.equal(formatValue(schema.properties[3], false), "No");
 });

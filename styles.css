@@ -176,10 +176,43 @@ body.nfo-compact {
 
 .nfo-table-scroll { overflow-x: auto; }
 
+/*
+ * The plugin's own table, stated explicitly.
+ *
+ * A theme that restyles markdown tables restyles ours too, and several do the
+ * responsive trick of `table, tr, td { display: block }` so cells stack on a
+ * narrow screen. In a database that is not a cosmetic difference: every value
+ * in a row piles into one column and the table stops being readable at all.
+ *
+ * So the display roles are declared rather than inherited from the user agent.
+ * This costs nothing when no theme interferes and survives it when one does.
+ */
 .nfo-table {
+	display: table;
 	width: 100%;
 	border-collapse: collapse;
 	table-layout: auto;
+}
+
+.nfo-table > thead { display: table-header-group; }
+.nfo-table > tbody { display: table-row-group; }
+.nfo-table > tfoot { display: table-footer-group; }
+.nfo-table tr { display: table-row; }
+
+.nfo-table th,
+.nfo-table td {
+	display: table-cell;
+	box-sizing: border-box;
+	/* Themes sometimes add a ::before carrying the column name for their
+	   stacked layout. Ours has real headers, so that would be a duplicate. */
+	content-visibility: visible;
+}
+
+.nfo-table th::before,
+.nfo-table td::before,
+.nfo-table th::after,
+.nfo-table td::after {
+	content: none;
 }
 
 .nfo-table .nfo-th {

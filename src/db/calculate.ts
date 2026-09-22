@@ -1,6 +1,7 @@
 import { DatabaseRow, PropertyDef, RollupFunction, ROLLUP_FUNCTION_LABELS } from "../types";
 import { collapse } from "./rollup";
 import { asText } from "../utils/text";
+import { formatCurrency } from "./currency";
 
 /**
  * Column footers — the "Calculate" row under a table.
@@ -70,14 +71,29 @@ export function calculationLabel(how: RollupFunction): string {
 	return ROLLUP_FUNCTION_LABELS[how];
 }
 
+/**
+ * Aggregations whose result is still in the property's own units, so a currency
+ * property's sum is money but its count is just a number.
+ */
+const KEEPS_UNITS: RollupFunction[] = ["sum", "average", "median", "min", "max", "range"];
+
 /** Render a calculation result as text. */
-export function formatCalculation(how: RollupFunction, value: unknown): string {
+export function formatCalculation(
+	how: RollupFunction,
+	value: unknown,
+	prop?: PropertyDef
+): string {
 	if (value === null || value === undefined) return "—";
 	if (Array.isArray(value)) return String(value.length);
 	if (typeof value === "number") {
 		const rounded = Math.round(value * 100) / 100;
 		if (how.startsWith("percent_")) return `${rounded}%`;
 		if (how === "date_range") return `${rounded} days`;
+		// A sum of money is money. Counts are not, so only the aggregations that
+		// stay in the property's own units carry its currency.
+		if (prop?.numberFormat === "currency" && KEEPS_UNITS.includes(how)) {
+			return formatCurrency(rounded, prop.currency);
+		}
 		return String(rounded);
 	}
 	return asText(value);

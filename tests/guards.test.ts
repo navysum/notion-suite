@@ -173,3 +173,33 @@ test("nothing reaches the network without a setting behind it", () => {
 	}
 	assert.deepEqual(offenders, [], `Network calls: ${offenders.join(", ")}`);
 });
+
+/**
+ * Bug class: a theme quietly restyling the plugin's own table.
+ *
+ * Reported from a real vault — every value in a row piled into the first
+ * column, because the theme did the responsive trick of
+ * `table, tr, td { display: block }` and our table inherited it. In a database
+ * that is not a cosmetic difference: the table stops being readable at all.
+ *
+ * The fix is to declare the display roles rather than inherit them from the
+ * user agent, and no unit test can see CSS, so this guards the declarations
+ * themselves. It proves the rules are present, not that they render — that
+ * stays in docs/SMOKE.md.
+ */
+test("the table declares its own layout, so a theme cannot collapse it", () => {
+	const css = readFileSync(path.join(process.cwd(), "styles.css"), "utf8");
+	const required = [
+		".nfo-table {",
+		"display: table;",
+		"display: table-row-group;",
+		"display: table-row;",
+		"display: table-cell;",
+	];
+	const missing = required.filter((rule) => !css.includes(rule));
+	assert.deepEqual(
+		missing,
+		[],
+		`styles.css must keep these, or a theme can stack the cells: ${missing.join(", ")}`
+	);
+});

@@ -84,7 +84,7 @@ export function renderBoard(
 			const total = calculateColumn(group.rows, prop, how);
 			column.createDiv({
 				cls: "nfo-board-calc",
-				text: `${prop.name} ${calculationLabel(how).toLowerCase()}: ${formatCalculation(how, total)}`,
+				text: `${prop.name} ${calculationLabel(how).toLowerCase()}: ${formatCalculation(how, total, prop)}`,
 			});
 		}
 

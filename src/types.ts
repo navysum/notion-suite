@@ -200,6 +200,12 @@ export interface PropertyDef {
 	/** For `formula`: an expression evaluated per row. */
 	formula?: string;
 	numberFormat?: "plain" | "percent" | "currency";
+	/**
+	 * ISO code for a currency-formatted number, e.g. `GBP`. Absent means the
+	 * machine's own locale decides, which is right far more often than the
+	 * dollar sign this used to hard-code.
+	 */
+	currency?: string;
 	hidden?: boolean;
 	width?: number;
 }

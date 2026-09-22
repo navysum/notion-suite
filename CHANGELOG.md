@@ -3,6 +3,43 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.7.1
+
+Three things found by using it on a real vault.
+
+### Fixed
+
+- **A theme could collapse the table into one column.** Several themes make
+  markdown tables responsive with `table, tr, td { display: block }` so cells
+  stack on a narrow screen, and the plugin's own table inherited it -- every
+  value in a row piled into the first column under the first heading. In a
+  database that is not cosmetic: the table stops being readable. The table now
+  declares its own display roles instead of relying on the ones a theme is free
+  to change.
+- **"This database no longer exists" stayed on screen above a working
+  database.** A tab restored at startup can draw before the store has finished
+  loading; the message shown then was never cleared, and the next render
+  inserted the header above it and the table below it, so a perfectly fine
+  database sat under a red box saying it was gone.
+- **Money was always dollars.** A currency-formatted number was hard-coded to
+  `$`, which is wrong for most people using this and silently wrong -- a UK
+  budget reading `$1,500` looks like a working number rather than a bug.
+
+### Added
+
+- **Pick the currency on a number property.** Forty-four of them, defaulting to
+  the one your machine's locale implies, so someone in Manchester gets pounds
+  without going looking. It is not only the symbol: placement, digit grouping
+  and decimals all follow the currency, so `1.500,00 €` in Germany and `₹1,500`
+  in India come out right.
+- Column totals, board totals and group totals carry the currency too -- a sum
+  of money is money, while a count of rows stays a number.
+
+### Also
+
+- A fractional price showed a single decimal: `$419.5` rather than `$419.50`. A
+  currency with no minor unit, like the yen, still never grows one.
+
 ## 1.7.0
 
 Six bugs found by auditing what people are hitting now that the plugin is in

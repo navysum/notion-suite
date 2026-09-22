@@ -14,6 +14,7 @@ import {
 	StatusStage,
 } from "../types";
 import { autoColor } from "../utils/dom";
+import { CURRENCIES, defaultCurrency } from "../db/currency";
 
 /**
  * Point a dropdown at `preferred` if that is a real option, else at the first
@@ -206,8 +207,30 @@ export class PropertyModal extends Modal {
 				dropdown.addOption("currency", "Currency");
 				dropdown
 					.setValue(this.draft.numberFormat ?? "plain")
-					.onChange((value) => (this.draft.numberFormat = value as "plain" | "percent" | "currency"));
+					.onChange((value) => {
+						this.draft.numberFormat = value as "plain" | "percent" | "currency";
+						// The currency picker only exists for a currency, so the
+						// form has to be redrawn rather than just updated.
+						parent.empty();
+						this.renderTypeOptions(parent);
+					});
 			});
+
+			if (this.draft.numberFormat === "currency") {
+				new Setting(parent)
+					.setName("Currency")
+					.setDesc(
+						"The symbol, where it sits and how the digits are grouped all follow " +
+							"the currency, so this is not only a symbol swap."
+					)
+					.addDropdown((dropdown) => {
+						for (const entry of CURRENCIES) dropdown.addOption(entry.code, entry.label);
+						this.draft.currency = this.draft.currency ?? defaultCurrency();
+						dropdown
+							.setValue(this.draft.currency)
+							.onChange((value) => (this.draft.currency = value));
+					});
+			}
 		}
 
 		if (type === "formula") {

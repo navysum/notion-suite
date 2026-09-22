@@ -9,6 +9,36 @@ import { RecurrenceModal } from "../ui/recurrenceModal";
 
 export const DATABASE_VIEW_TYPE = "notion-suite-database";
 
+/** Marks the "this database is gone" message so a later render can clear it. */
+const MISSING_CLASS = "nfo-page-missing";
+
+/**
+ * Put the page into the right state for whether the database exists.
+ *
+ * Returns false when it does not, meaning the caller should stop.
+ *
+ * The clearing half is the part that matters. A tab restored at startup can
+ * draw before the store has finished loading, and the message shown then was
+ * never removed: the next render inserted the header *before* it and the body
+ * *after* it, so a perfectly working database sat underneath a red box saying
+ * it no longer existed.
+ */
+export function renderPageChrome(
+	container: HTMLElement,
+	schema: { name: string } | null
+): boolean {
+	if (!schema) {
+		container.empty();
+		container.createDiv({
+			cls: `nfo-callout-error ${MISSING_CLASS}`,
+			text: "This database no longer exists. It may have been removed from settings.",
+		});
+		return false;
+	}
+	container.querySelector(`.${MISSING_CLASS}`)?.remove();
+	return true;
+}
+
 export interface DatabaseViewState {
 	databaseId: string;
 	viewType: ViewType;
@@ -86,13 +116,9 @@ export class DatabaseItemView extends ItemView {
 		container.addClass("nfo-page");
 
 		const schema = this.plugin.store.get(this.databaseId);
-		if (!schema) {
-			container.empty();
+		if (!schema || !renderPageChrome(container, schema)) {
+			renderPageChrome(container, null);
 			this.bodyEl = null;
-			container.createDiv({
-				cls: "nfo-callout-error",
-				text: "This database no longer exists. It may have been removed from settings.",
-			});
 			return;
 		}
 
