@@ -3,6 +3,30 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.7.2
+
+The real cause of the collapsed table, found in a pull request against 1.7.0.
+
+### Fixed
+
+- **The table view stacked every value into one column.** `renderCell` added
+  `.nfo-cell` to whatever element it was handed, and that class is
+  `display: flex`. On a board card that element is a `div`, where flex is
+  right; in the table it is the `<td>` itself, and a flex `<td>` stops being a
+  table cell -- so the columns collapsed and every value piled up under the
+  first heading. The cell layout now lives on an element `renderCell` creates,
+  so the helper no longer restyles its container.
+
+  1.7.1 blamed this on themes and added display rules that most likely masked
+  it by specificity. That was the wrong diagnosis: the offending CSS was this
+  plugin's own. The defensive rules stay -- a database table should not be at
+  the mercy of a theme either way -- but they are no longer what is holding the
+  layout together.
+
+  A test now renders a table and fails if a `<td>` ever carries `.nfo-cell`
+  again. Nothing caught this for eight releases because the unit tests never
+  laid out a page.
+
 ## 1.7.1
 
 Three things found by using it on a real vault.

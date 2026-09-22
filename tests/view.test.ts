@@ -116,6 +116,33 @@ test("switching view type keeps the search", async () => {
 	assert.equal(container.querySelector<HTMLInputElement>(".nfo-search")?.value, "room");
 });
 
+/**
+ * Shipped since the first release, found by screenshotting the real plugin: every
+ * property in a row stacked into one column. `renderCell` put `.nfo-cell`
+ * (`display: flex`) on whatever element it was handed, and in the table that is
+ * the <td>. A flex <td> is no longer a table cell, so the column layout collapsed.
+ */
+test("a table cell stays a table cell, with its value in a child element", () => {
+	const { container } = mount(table);
+	const cells = all(container, ".nfo-td");
+	assert.ok(cells.length > 0, "the table drew no cells");
+
+	for (const td of cells) {
+		assert.equal(
+			td.classList.contains("nfo-cell"),
+			false,
+			"the <td> itself carries .nfo-cell, which makes it display: flex and breaks the table layout"
+		);
+	}
+
+	// The value still renders, one .nfo-cell per property cell, inside the <td>.
+	const valueCells = all(container, ".nfo-td .nfo-cell");
+	assert.ok(valueCells.length > 0, "no cell contents were rendered");
+	for (const cell of valueCells) {
+		assert.equal(cell.tagName, "DIV", "the cell layout must live on an element renderCell creates");
+	}
+});
+
 /* -------------------------------------------- state that outlives a refresh */
 
 const subItems: DatabaseRow[] = [
