@@ -959,8 +959,12 @@ src/
     calculate.ts     table footer calculations
     tree.ts          sub-items: building and walking the hierarchy
     order.ts         manual ordering positions
+    recur.ts         repeating rows
+    currency.ts      money values and currency formatting
+    csv.ts           CSV export
   views/
     renderer.ts      toolbar, search, dispatch to a view
+    context.ts       shared view context: guarded writes, opening a row
     viewState.ts     per-view state that has to survive a re-render
     table.ts board.ts gallery.ts list.ts calendar.ts timeline.ts
     cells.ts         the editable cell widgets
@@ -984,8 +988,20 @@ src/
     propertyModal.ts create/edit/delete a property, including rollups
     confirmModal.ts  confirm() and choose() dialogs
     bulkModal.ts     setting one property across many rows
+    filterBuilder.ts click-to-build filters and sorts
+    propertyPanel.ts a row's properties at the top of its own note
+    relationModal.ts picking which rows a relation points at
+    recurrenceModal.ts  setting up repeating rows
+    saveViewModal.ts naming a view so it can be reopened
+    templateModal.ts saving a row as a reusable template
+    pageStyleModal.ts   page icon/cover starting points
     pageBanner.ts    page icons and covers
     templates.ts     the nine starter databases
+  utils/
+    async.ts         fire-and-forget work that reports its failures
+    dates.ts         ISO YYYY-MM-DD date helpers
+    dom.ts           element factory over Obsidian's createEl
+    text.ts          turning unknown values into display text
 ```
 
 ### Tests
@@ -1000,6 +1016,15 @@ tests/
   guards.test.ts     build-failing checks for mistakes this repo has made
   view.test.ts       views rendered into a real DOM and driven like a user
   interact.test.ts   dialogs, panes and drag-and-drop
+  filterBuilder.test.ts  building filters by clicking
+  propertyPanel.test.ts  properties at the top of a row's note
+  relation.test.ts   the relation picker
+  rename.test.ts     renaming a row and everything pointing at it
+  recur.test.ts      repeating rows
+  currency.test.ts   money
+  csv.test.ts        CSV export
+  guardgaps.test.ts  regression checks for fixes nothing else watched
+  run.mjs            bundles the suite and runs it once per time zone (UTC, New York, Berlin)
   dom.ts             a DOM plus Obsidian's element helpers
   obsidian-stub.ts   a stand-in for the Obsidian API
 ```
