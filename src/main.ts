@@ -34,6 +34,7 @@ import { SIDEBAR_VIEW_TYPE, DatabaseSidebarView } from "./views/sidebar";
 import { renderBreadcrumb, renderTableOfContents } from "./views/pageBlocks";
 import { registerBanners } from "./ui/pageBanner";
 import { registerPropertyPanel } from "./ui/propertyPanel";
+import { registerBasesBoard } from "./bases/boardView";
 import { PageStyleModal } from "./ui/pageStyleModal";
 import { runDetached } from "./utils/async";
 
@@ -95,6 +96,10 @@ export default class NotionForObsidian extends Plugin {
 			bannerHeight: this.settings.bannerHeight,
 			allowRemoteCovers: this.settings.allowRemoteCovers,
 		}));
+
+		// Obsidian ships its own database feature now. Rather than compete with
+		// it, the board is offered as a view type inside any Base.
+		registerBasesBoard(this);
 
 		this.registerVaultListeners();
 		this.registerCommands();

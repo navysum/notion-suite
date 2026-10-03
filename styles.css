@@ -1953,3 +1953,91 @@ body.nfo-typography hr {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
+
+/* The board offered as a view type inside Obsidian's own Bases. */
+.nfo-bases-board {
+	height: 100%;
+	overflow: auto;
+	padding: 8px 4px;
+}
+
+.nfo-board-note {
+	padding: 6px 10px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-card-prop {
+	display: flex;
+	gap: 6px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	padding-top: 2px;
+}
+
+.nfo-card-prop-name {
+	opacity: 0.7;
+	flex-shrink: 0;
+}
+
+.nfo-card-prop-value {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/*
+ * Narrow screens.
+ *
+ * The manifest has always said this works on mobile. Boards scroll sideways
+ * rather than squeezing columns to nothing, the property panel stacks its
+ * labels above its values instead of giving each a third of a phone's width,
+ * and anything draggable stops the browser claiming the gesture as a scroll.
+ */
+.nfo-card,
+.nfo-tr,
+.nfo-board-cards {
+	touch-action: pan-y;
+}
+
+.nfo-card-dragging {
+	opacity: 0.55;
+}
+
+@media (max-width: 700px) {
+	.nfo-board {
+		gap: 10px;
+	}
+
+	.nfo-board-column {
+		min-width: 78vw;
+	}
+
+	.nfo-props-row {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 2px;
+	}
+
+	.nfo-props-label {
+		width: auto;
+		max-width: none;
+		padding-top: 0;
+	}
+
+	.nfo-filter-row {
+		flex-wrap: wrap;
+	}
+
+	.nfo-filter-prop {
+		max-width: none;
+	}
+
+	.nfo-page {
+		padding: 14px 12px 32px;
+	}
+
+	.nfo-toolbar-actions {
+		flex-wrap: wrap;
+	}
+}

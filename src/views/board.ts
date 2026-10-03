@@ -9,6 +9,7 @@ import { asText } from "../utils/text";
 import { createInlineRow, renderTemplatePicker } from "./table";
 import { DEFAULT_ORDER_PROPERTY, positionFor, seedPositions, sortByOrder } from "../db/order";
 import { confirm } from "../ui/confirmModal";
+import { closestMatch, enableTouchDrag } from "../utils/drag";
 
 /**
  * Databases whose owner declined to set up manual ordering this session.
@@ -46,6 +47,9 @@ export function renderBoard(
 
 	for (const group of groups) {
 		const column = board.createDiv({ cls: "nfo-board-column" });
+		// The touch drag resolves its target from the DOM, since a finger has
+		// no dataTransfer to carry the destination in.
+		column.setAttribute("data-group-key", group.key);
 		const isCollapsed = collapsed.has(group.key);
 		if (isCollapsed) column.addClass("nfo-board-collapsed");
 
@@ -120,7 +124,7 @@ export function renderBoard(
 				pill(bandHead, sub.label, option?.color ?? autoColor(sub.key));
 				bandHead.createSpan({ cls: "nfo-board-count", text: String(sub.rows.length) });
 				for (const row of sub.rows) {
-					renderCard(band, ctx, row, cardProperties, view, group.key, [], 0, groupProp, rows);
+					renderCard(band, ctx, row, cardProperties, view, group.key, [], 0, groupProp, rows, groups);
 				}
 			}
 		} else {
@@ -138,7 +142,8 @@ export function renderBoard(
 					columnRows,
 					position,
 					groupProp,
-					rows
+					rows,
+					groups
 				);
 			});
 		}
@@ -433,7 +438,8 @@ function renderCard(
 	siblings: DatabaseRow[] = [],
 	position = 0,
 	groupProp?: PropertyDef,
-	visibleRows: DatabaseRow[] = []
+	visibleRows: DatabaseRow[] = [],
+	groups: RowGroup[] = []
 ): void {
 	const card = parent.createDiv({ cls: "nfo-card" });
 	card.setAttribute("draggable", "true");
@@ -444,6 +450,49 @@ function renderCard(
 		card.addClass("nfo-card-dragging");
 	});
 	card.addEventListener("dragend", () => card.removeClass("nfo-card-dragging"));
+
+	// The same move by finger. HTML5 drag never fires on touch, so without
+	// this a card on a phone simply could not be moved, with nothing to say so.
+	enableTouchDrag(card, {
+		onMove: (over) => {
+			const list = closestMatch(over, ".nfo-board-cards");
+			for (const el of Array.from(document.querySelectorAll(".nfo-drop-active"))) {
+				el.removeClass("nfo-drop-active");
+			}
+			list?.addClass("nfo-drop-active");
+		},
+		onEnd: () => {
+			for (const el of Array.from(document.querySelectorAll(".nfo-drop-active"))) {
+				el.removeClass("nfo-drop-active");
+			}
+		},
+		onDrop: (over) => {
+			const list = closestMatch(over, ".nfo-board-cards");
+			const column = closestMatch(list, ".nfo-board-column");
+			const target = column?.getAttribute("data-group-key");
+			if (!list || target === null || target === undefined || !groupProp) return;
+
+			// Dropped onto a card: land beside it, so reordering works by
+			// finger too. Onto the column's empty space: land at the end.
+			const onCard = closestMatch(over, ".nfo-card");
+			const cards = Array.from(list.querySelectorAll(".nfo-card"));
+			const index = onCard ? cards.indexOf(onCard) : cards.length;
+			const group = groups.find((entry: RowGroup) => entry.key === target);
+			runMove(
+				moveCard(
+					ctx,
+					row.path,
+					groupProp,
+					groupKey,
+					target,
+					group?.rows ?? [],
+					index < 0 ? cards.length : index,
+					view,
+					visibleRows
+				)
+			);
+		},
+	});
 
 	// Dropping onto a card inserts relative to it, which is what makes
 	// reordering inside a column possible at all.
