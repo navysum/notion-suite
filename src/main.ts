@@ -36,6 +36,8 @@ import { registerBanners } from "./ui/pageBanner";
 import { registerPropertyPanel } from "./ui/propertyPanel";
 import { registerBasesBoard } from "./bases/boardView";
 import { PageStyleModal } from "./ui/pageStyleModal";
+import { createStarterWorkspace } from "./ui/starter";
+import { confirm } from "./ui/confirmModal";
 import { runDetached } from "./utils/async";
 
 export default class NotionForObsidian extends Plugin {
@@ -110,9 +112,46 @@ export default class NotionForObsidian extends Plugin {
 		// rather than waiting to be found in the command palette.
 		this.app.workspace.onLayoutReady(() => {
 			if (this.settings.openSidebarOnStart) void this.revealSidebar(false);
+			void this.offerStarter();
 		});
 		this.addSettingTab(new NotionSettingTab(this.app, this));
 		this.applyBodyClasses();
+	}
+
+	/**
+	 * Offer the starter page, once, to a vault that has no databases.
+	 *
+	 * A new install used to show an empty sidebar and nothing else, so
+	 * everything the plugin does sat behind a slash command nobody had a
+	 * reason to type. This asks rather than creating: making notes in
+	 * somebody's vault uninvited is not a first impression worth having.
+	 */
+	private async offerStarter(): Promise<void> {
+		if (this.settings.starterOffered) return;
+		if (this.store.all().length > 0) {
+			// An existing user updating into this version is not a new user.
+			this.settings.starterOffered = true;
+			await this.saveSettings();
+			return;
+		}
+
+		this.settings.starterOffered = true;
+		await this.saveSettings();
+
+		const yes = await confirm(this.app, {
+			title: "Set up an example to look at?",
+			body:
+				"Notion Suite can make you a Tasks database with a few rows, and a page " +
+				"showing them as a board, a table, some counts and a chart.",
+			detail:
+				"Everything on it is an ordinary block you can change, copy or delete. " +
+				"You can also do this later from the command palette.",
+			confirmText: "Set it up",
+			cancelText: "Not now",
+		});
+		if (!yes) return;
+
+		await createStarterWorkspace(this);
 	}
 
 	onunload(): void {
@@ -273,6 +312,14 @@ export default class NotionForObsidian extends Plugin {
 						);
 					});
 				});
+			},
+		});
+
+		this.addCommand({
+			id: "starter-workspace",
+			name: "Set up an example database and page",
+			callback: () => {
+				runDetached("set that up", () => createStarterWorkspace(this));
 			},
 		});
 

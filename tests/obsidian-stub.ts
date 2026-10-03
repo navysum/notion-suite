@@ -340,4 +340,14 @@ function makeEl(): HTMLElement {
 	} as unknown as HTMLElement;
 }
 
+export const Platform = {
+	isMobile: false,
+	isDesktop: true,
+	isWin: false,
+	isMacOS: false,
+	isLinux: true,
+	isAndroidApp: false,
+	isIosApp: false,
+};
+
 export const setIcon = (): void => undefined;

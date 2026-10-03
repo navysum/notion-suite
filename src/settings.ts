@@ -9,6 +9,7 @@ import type NotionForObsidian from "./main";
 import { DatabaseSchema } from "./types";
 import { ImportFolderModal } from "./ui/modals";
 import { runDetached } from "./utils/async";
+import { openBugReport } from "./ui/report";
 
 export interface NotionSettings {
 	enableSlashMenu: boolean;
@@ -17,6 +18,8 @@ export interface NotionSettings {
 	notionTypography: boolean;
 	sidePeek: boolean;
 	openSidebarOnStart: boolean;
+	/** Set once the starter page has been offered, so it is offered only once. */
+	starterOffered: boolean;
 	showBanners: boolean;
 	/** Show a row's properties at the top of its own note. */
 	showPropertyPanel: boolean;
@@ -35,6 +38,7 @@ export const DEFAULT_SETTINGS: NotionSettings = {
 	notionTypography: true,
 	sidePeek: true,
 	openSidebarOnStart: true,
+	starterOffered: false,
 	showBanners: true,
 	showPropertyPanel: true,
 	allowRemoteCovers: false,
@@ -180,6 +184,17 @@ export class NotionSettingTab extends PluginSettingTab {
 						desc: "Tighter row height in table and list views.",
 						aliases: ["density", "spacing"],
 						control: { type: "toggle", key: "compactRows", defaultValue: false },
+					},
+					{
+						name: "Report a problem",
+						desc:
+							"Opens a bug report with your versions already filled in. Ideas are " +
+							"as welcome as bugs — if something is awkward rather than broken, " +
+							"that is worth knowing too.",
+						aliases: ["bug", "issue", "feedback", "help", "support", "github"],
+						action: () => {
+							openBugReport(this.app, { pluginVersion: this.plugin.manifest.version });
+						},
 					},
 					{
 						name: "Import an existing folder",

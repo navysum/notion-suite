@@ -3,6 +3,49 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.8.0
+
+Obsidian ships its own database feature now, so this release is partly about
+sitting beside it rather than against it -- and partly about two things that
+were quietly broken.
+
+### Added
+
+- **The board is now a view type inside Obsidian's own Bases.** Open any Base,
+  pick Board from the view menu, drag a card, and the grouping property is
+  written. Bases does the querying, filtering and grouping that every Obsidian
+  user already has; this adds the view it has not got. Grouping by a formula is
+  readable but not draggable, and says so, because only a note property is a
+  frontmatter key anything can write.
+- **Two-way relations.** A relation can name the property on the other database
+  to mirror into, so linking a task to a project puts the task on the project.
+  The mirror is an ordinary list of titles in ordinary frontmatter -- no hidden
+  link table -- so a vault opened without this plugin still shows both sides,
+  and a link already written as `[[Wikilink]]` is left exactly as written.
+- **Rules: when this changes, do that.** "When Status becomes Done, set
+  Completed to today." Each rule reads as that sentence, and fires on the
+  change rather than the state, so re-picking a value it already had does
+  nothing — a completion date is stamped once, not every time the menu opens.
+- **Something to land on.** A new install showed an empty sidebar. There is now
+  one command that builds a Tasks database with rows in it and a page driving
+  them: a board, a table, live counts and a chart. It is made of ordinary
+  blocks, so all of it can be clicked, changed and copied.
+- **A way to tell us something is wrong.** Settings has a "Report a problem"
+  button that opens a bug report with your versions already filled in.
+
+### Fixed
+
+- **Dragging did nothing on a phone.** The manifest has always said
+  `isDesktopOnly: false`, and the boards used HTML5 drag-and-drop, which never
+  fires on touch: a card could not be moved at all, with no movement, no error
+  and no hint that the gesture was unsupported. Dragging is now also
+  implemented with pointer events, kept alongside the native one so desktop
+  keeps Obsidian's own drag affordances. A touch drag waits for a long press,
+  since a finger that moves is usually scrolling.
+- **Narrow screens.** Boards scroll sideways rather than squeezing columns to
+  nothing, and the property panel stacks rather than giving its labels a third
+  of a phone's width.
+
 ## 1.7.2
 
 The real cause of the collapsed table, found in a pull request against 1.7.0.

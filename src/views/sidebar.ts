@@ -3,6 +3,7 @@ import type NotionForObsidian from "../main";
 import { databaseContextMenu, openDatabaseTab } from "./databaseView";
 import { viewIcon } from "./renderer";
 import { runDetached } from "../utils/async";
+import { createStarterWorkspace } from "../ui/starter";
 import { queryRows } from "../db/query";
 
 export const SIDEBAR_VIEW_TYPE = "notion-suite-sidebar";
@@ -61,6 +62,14 @@ export class DatabaseSidebarView extends ItemView {
 			empty.createDiv({ text: "No databases yet." });
 			const create = empty.createDiv({ cls: "nfo-sidebar-create", text: "Create your first one" });
 			create.addEventListener("click", () => this.plugin.commandNewDatabase());
+			// The other door, for someone who would rather be shown than asked.
+			const example = empty.createDiv({
+				cls: "nfo-sidebar-create",
+				text: "…or set up an example to look at",
+			});
+			example.addEventListener("click", () => {
+				runDetached("set that up", () => createStarterWorkspace(this.plugin));
+			});
 			return;
 		}
 

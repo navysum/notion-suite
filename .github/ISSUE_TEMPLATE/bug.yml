@@ -1,0 +1,42 @@
+name: Something is wrong
+description: A thing that does not work, or works differently than it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Nothing here is compulsory — a sentence and a
+        screenshot is already more than most people send, and is usually enough.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      placeholder: Dragging a card between columns did nothing.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      placeholder: The card moves, and the note's Status changes.
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to see it
+      description: Even a rough list helps more than you would think.
+      placeholder: |
+        1. Open a board grouped by Status
+        2. Drag any card to another column
+        3. Nothing moves
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Settings → Notion Suite has a "Report a problem" button that fills this in for you.
+      placeholder: "Notion Suite 1.8.0, Obsidian 1.13.7, Windows"
+  - type: textarea
+    id: console
+    attributes:
+      label: Anything in the console
+      description: Ctrl/Cmd+Shift+I → Console. Skip it if that means nothing to you.
+      render: text

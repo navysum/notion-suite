@@ -1,0 +1,17 @@
+name: An idea
+description: Something you wish it did.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What you are trying to get done
+      description: >
+        The problem behind the idea is often more useful than the idea — there
+        may be a better answer to it than the one either of us thought of first.
