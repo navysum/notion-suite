@@ -5,7 +5,7 @@ import { autoColor, pill } from "../utils/dom";
 import { formatDate, toISODate } from "../utils/dates";
 import { runWrite, ViewContext, openRow } from "./context";
 import { RelationPickerModal } from "../ui/relationModal";
-import { asText } from "../utils/text";
+import { asText, asList } from "../utils/text";
 
 const READ_ONLY: string[] = ["formula", "rollup", "created", "updated", "uniqueid"];
 
@@ -312,9 +312,11 @@ function promptForOption(
 		}
 		await ctx.store.ensureOption(ctx.schema.id, prop.id, name);
 		if (multi) {
-			const current = Array.isArray(row.values[prop.id])
-				? (row.values[prop.id] as string[]).map(String)
-				: [];
+			// asList, not an Array.isArray guard: a multi-select holding a bare
+			// string -- `tags: Work`, which is how most people write one by
+			// hand -- fell through to [] here, so adding a second option threw
+			// the first one away.
+			const current = asList(row.values[prop.id]);
 			commit(ctx, row, prop, [...current, name]);
 		} else {
 			commit(ctx, row, prop, name);

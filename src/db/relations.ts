@@ -65,7 +65,12 @@ export function diffLinks(before: unknown, after: unknown): LinkChange {
  */
 export function withLink(current: unknown, title: string): unknown[] {
 	const entries = Array.isArray(current) ? [...(current as unknown[])] : current ? [current] : [];
-	const already = entries.some((entry) => linkTarget(entry).toLowerCase() === title.toLowerCase());
+	// The title is normalised too. These used to compare a normalised entry
+	// against a raw title, so passing `[[Zeta]]` appended it and then could
+	// never match it again: the link went in and could not be taken out.
+	const wanted = linkTarget(title).toLowerCase();
+	if (!wanted) return entries;
+	const already = entries.some((entry) => linkTarget(entry).toLowerCase() === wanted);
 	if (already) return entries;
 	return [...entries, title];
 }
@@ -73,7 +78,9 @@ export function withLink(current: unknown, title: string): unknown[] {
 /** Remove a title from a relation cell, leaving the rest as written. */
 export function withoutLink(current: unknown, title: string): unknown[] {
 	const entries = Array.isArray(current) ? (current as unknown[]) : current ? [current] : [];
-	return entries.filter((entry) => linkTarget(entry).toLowerCase() !== title.toLowerCase());
+	const wanted = linkTarget(title).toLowerCase();
+	if (!wanted) return entries;
+	return entries.filter((entry) => linkTarget(entry).toLowerCase() !== wanted);
 }
 
 /**
@@ -84,5 +91,7 @@ export function withoutLink(current: unknown, title: string): unknown[] {
  * touch that note's file at all.
  */
 export function hasLink(current: unknown, title: string): boolean {
-	return linkList(current).some((t) => t.toLowerCase() === title.toLowerCase());
+	const wanted = linkTarget(title).toLowerCase();
+	if (!wanted) return false;
+	return linkList(current).some((t) => t.toLowerCase() === wanted);
 }

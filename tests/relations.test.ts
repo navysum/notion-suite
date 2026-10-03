@@ -253,3 +253,43 @@ test("mirroring adds to the other side rather than replacing it", async () => {
 
 	assert.deepEqual(files["Projects/Launch.md"].tasks, ["Something else", "Ship it"]);
 });
+
+/* ------------------------------------------------- the title may be a link */
+
+/**
+ * Found by fuzzing: these compared a normalised entry against a **raw** title,
+ * so passing `[[Zeta]]` appended it and then could never match it again — the
+ * link went in and could not be taken out. Today's only caller passes a plain
+ * basename, so nothing was broken in the field, but a function that accepts a
+ * title should not care how that title was written.
+ */
+test("a wikilink passed as the title behaves like the plain name", () => {
+	assert.deepEqual(withLink(["Alpha"], "[[Zeta]]"), ["Alpha", "[[Zeta]]"]);
+	assert.deepEqual(withoutLink(["Alpha", "[[Zeta]]"], "[[Zeta]]"), ["Alpha"]);
+	assert.deepEqual(withoutLink(["Alpha", "Zeta"], "[[Zeta]]"), ["Alpha"]);
+	assert.equal(hasLink(["Alpha"], "[[Alpha]]"), true);
+	assert.equal(hasLink(["[[Alpha]]"], "Alpha"), true);
+});
+
+test("adding a link twice adds it once, however each was written", () => {
+	const once = withLink(["Alpha"], "[[Zeta]]");
+	assert.deepEqual(withLink(once, "Zeta"), once);
+	assert.deepEqual(withLink(once, "[[Zeta|an alias]]"), once);
+});
+
+/** An empty or meaningless title must not match everything, or remove it. */
+test("an empty title is not a link", () => {
+	assert.deepEqual(withLink(["Alpha"], ""), ["Alpha"]);
+	assert.deepEqual(withoutLink(["Alpha"], ""), ["Alpha"]);
+	assert.deepEqual(withoutLink(["Alpha"], "[[]]"), ["Alpha"]);
+	assert.equal(hasLink(["Alpha"], ""), false);
+});
+
+/** The property the fuzzer actually checks: add then remove is identity. */
+test("add then remove is identity, for any way of writing the title", () => {
+	for (const title of ["Zeta", "[[Zeta]]", "[[Zeta|alias]]", "[[Zeta#Heading]]", "zeta"]) {
+		const start: unknown[] = ["Alpha", "[[Beta]]"];
+		const round = withoutLink(withLink(start, title), title);
+		assert.deepEqual(linkList(round), linkList(start), `failed for ${title}`);
+	}
+});

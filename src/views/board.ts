@@ -5,7 +5,7 @@ import { findProperty, groupRows, RowGroup } from "../db/query";
 import { calculateColumn, calculationLabel, formatCalculation } from "../db/calculate";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill, rowIcon } from "../utils/dom";
-import { asText } from "../utils/text";
+import { asText, asList } from "../utils/text";
 import { createInlineRow, renderTemplatePicker } from "./table";
 import { DEFAULT_ORDER_PROPERTY, positionFor, seedPositions, sortByOrder } from "../db/order";
 import { confirm } from "../ui/confirmModal";
@@ -556,7 +556,7 @@ function renderCard(
 			const option = ctx.store.optionFor(prop, String(value));
 			pill(meta, String(value), option?.color ?? autoColor(String(value)));
 		} else if (prop.type === "multiselect") {
-			for (const item of value as string[]) {
+			for (const item of asList(value)) {
 				const option = ctx.store.optionFor(prop, item);
 				pill(meta, item, option?.color ?? autoColor(item));
 			}

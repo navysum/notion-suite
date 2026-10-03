@@ -146,17 +146,30 @@ export function applySorts(
 	sorts?: SortRule[]
 ): DatabaseRow[] {
 	if (!sorts || sorts.length === 0) return rows;
+
+	// Resolve each sort once, not once per comparison. findProperty is a scan
+	// of the schema, and a sort performs n log n comparisons -- so on a large
+	// database this was doing millions of scans to answer the same question.
+	const resolved: { prop: PropertyDef; isName: boolean; descending: boolean }[] = [];
+	for (const sort of sorts) {
+		const isName = sort.property.trim().toLowerCase() === "name";
+		const prop = findProperty(schema, sort.property);
+		if (!prop && !isName) continue;
+		resolved.push({
+			prop: prop ?? { id: "name", name: "Name", type: "text" },
+			isName,
+			descending: sort.direction === "desc",
+		});
+	}
+	if (resolved.length === 0) return rows;
+
 	const sorted = [...rows];
 	sorted.sort((a, b) => {
-		for (const sort of sorts) {
-			const isName = sort.property.trim().toLowerCase() === "name";
-			const prop = findProperty(schema, sort.property);
-			if (!prop && !isName) continue;
-			const descriptor: PropertyDef = prop ?? { id: "name", name: "Name", type: "text" };
-			const av = isName ? a.name : a.values[descriptor.id];
-			const bv = isName ? b.name : b.values[descriptor.id];
-			const cmp = compareValues(descriptor, av, bv);
-			if (cmp !== 0) return sort.direction === "desc" ? -cmp : cmp;
+		for (const sort of resolved) {
+			const av = sort.isName ? a.name : a.values[sort.prop.id];
+			const bv = sort.isName ? b.name : b.values[sort.prop.id];
+			const cmp = compareValues(sort.prop, av, bv);
+			if (cmp !== 0) return sort.descending ? -cmp : cmp;
 		}
 		return 0;
 	});

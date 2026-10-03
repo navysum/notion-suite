@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { all, click, host, installDom, settle, texts, tick, type } from "./dom";
+import { clickMenuItem, menuTitles } from "obsidian";
 
 installDom();
 
@@ -377,4 +378,54 @@ test("a board column carries the totals for its own cards", () => {
 test("a board with no calculations configured shows none", () => {
 	const container = mountRows(rows, { type: "board", db: "Tasks", groupBy: "status" } as unknown as ViewConfig);
 	assert.equal(all(container, ".nfo-board-calc").length, 0);
+});
+
+/**
+ * Adding an option to a multi-select that holds a bare string.
+ *
+ * `tags: Work` is how most people write one by hand. The add-an-option path
+ * guarded on `Array.isArray` and fell through to an empty list, so adding a
+ * second tag silently threw the first one away.
+ */
+test("adding an option keeps a value that was written as a bare string", async () => {
+	const schema: DatabaseSchema = {
+		id: "m",
+		name: "M",
+		folder: "M",
+		createdAt: 0,
+		views: [],
+		properties: [{ id: "tags", name: "Tags", type: "multiselect", options: [] }],
+	};
+	const written: unknown[] = [];
+	const rows = [{ path: "M/a.md", name: "A", values: { tags: "Work" } }] as DatabaseRow[];
+	const container = host();
+	const ctx = {
+		app: { workspace: {} },
+		store: {
+			rows: () => rows,
+			getFile: () => null,
+			optionFor: () => undefined,
+			ensureOption: async () => undefined,
+			setValue: async (_s: unknown, _p: string, _k: string, value: unknown) => {
+				written.push(value);
+			},
+		} as unknown as DatabaseStore,
+		schema,
+		sourcePath: "N.md",
+		refresh: () => undefined,
+	} as unknown as ViewContext;
+
+	renderDatabaseView(container, ctx, { type: "table", db: "M" } as unknown as ViewConfig);
+
+	// The cell opens a menu; the menu offers the prompt.
+	click(container.querySelector(".nfo-cell-select"));
+	clickMenuItem("Add new option…");
+
+	const prompt = container.querySelector<HTMLInputElement>(".nfo-inline-prompt input");
+	assert.ok(prompt, "the add-an-option prompt did not open");
+	prompt.value = "Urgent";
+	prompt.dispatchEvent(new Event("blur", { bubbles: true }));
+	await settle(20);
+
+	assert.deepEqual(written[0], ["Work", "Urgent"], "the existing tag was thrown away");
 });

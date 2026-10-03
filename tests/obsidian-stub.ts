@@ -115,16 +115,107 @@ export class FuzzySuggestModal {}
 export class Plugin {}
 export class MarkdownRenderChild {}
 export class TFolder {}
-export class Menu {
-	addItem(): this {
+/**
+ * Menus, real enough to drive.
+ *
+ * Almost every action in this plugin is behind a menu -- the row context menu,
+ * the column menu, the property menu, "add an option". None of it was
+ * reachable from a test, so a whole class of behaviour was only ever checked
+ * by hand. A menu now records its items and `clickMenuItem` runs one.
+ */
+export interface StubMenuItem {
+	title: string;
+	disabled: boolean;
+	checked: boolean;
+	handler?: () => void;
+}
+
+/** Menus opened and not yet dismissed, most recent last. */
+export const openMenus: StubMenu[] = [];
+
+class StubMenuItemBuilder implements StubMenuItem {
+	title = "";
+	disabled = false;
+	checked = false;
+	handler?: () => void;
+	setTitle(text: string): this {
+		this.title = text;
+		return this;
+	}
+	setIcon(): this {
+		return this;
+	}
+	setChecked(on: boolean): this {
+		this.checked = on;
+		return this;
+	}
+	setDisabled(on: boolean): this {
+		this.disabled = on;
+		return this;
+	}
+	setSection(): this {
+		return this;
+	}
+	setWarning(): this {
+		return this;
+	}
+	onClick(handler: () => void): this {
+		this.handler = handler;
+		return this;
+	}
+}
+
+export class StubMenu {
+	items: StubMenuItem[] = [];
+	addItem(callback: (item: StubMenuItemBuilder) => void): this {
+		const item = new StubMenuItemBuilder();
+		callback(item);
+		this.items.push(item);
 		return this;
 	}
 	addSeparator(): this {
 		return this;
 	}
 	showAtMouseEvent(): this {
+		openMenus.push(this);
 		return this;
 	}
+	showAtPosition(): this {
+		openMenus.push(this);
+		return this;
+	}
+	hide(): this {
+		const at = openMenus.indexOf(this);
+		if (at >= 0) openMenus.splice(at, 1);
+		return this;
+	}
+}
+
+export const Menu = StubMenu;
+
+/** The menu most recently opened. */
+export function currentMenu(): StubMenu {
+	const menu = openMenus[openMenus.length - 1];
+	if (!menu) throw new Error("no menu is open");
+	return menu;
+}
+
+/** Choose an item from the open menu, by its exact title. */
+export function clickMenuItem(title: string): void {
+	const menu = currentMenu();
+	const item = menu.items.find((entry) => entry.title === title);
+	if (!item) {
+		throw new Error(
+			`no menu item "${title}". Present: ${menu.items.map((i) => i.title).join(", ") || "none"}`
+		);
+	}
+	menu.hide();
+	item.handler?.();
+}
+
+/** What the open menu offers, for a test that wants to assert on the list. */
+export function menuTitles(): string[] {
+	return currentMenu().items.map((item) => item.title);
 }
 
 /**

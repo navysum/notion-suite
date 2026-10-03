@@ -3,6 +3,47 @@
 All notable changes to this plugin are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.8.1
+
+Found by throwing deliberately hostile input at everything. Six real problems,
+all of them from the same habit: trusting the shape of a value that came out of
+somebody's hand-written frontmatter.
+
+### Fixed
+
+- **A list property holding a bare string crashed the view.** `tags: Work` is
+  far more common in hand-written frontmatter than `tags: [Work]`, and four
+  places iterated such a value with a cast rather than a check. A number or a
+  map threw "not iterable" straight out of the render, which does not land in a
+  tidy error box -- it takes the note's rendering with it. A bare string was
+  worse in its way: it iterated character by character and drew a chip per
+  letter.
+- **Adding a tag to a multi-select written as a bare string threw the old one
+  away.** The same guard, used the other way round: `tags: Work` fell through
+  to an empty list, so adding `Urgent` left you with only `Urgent`.
+- **A property holding a map rendered as `[object Object]`** in a cell, a card
+  and a chart label, as though that were data.
+- **Sorting by a text property was eighteen times slower than it needed to
+  be.** `localeCompare(x, undefined, options)` builds a fresh collation on
+  every call, and a sort makes n log n of them -- five thousand rows took
+  328ms, on every render, including every keystroke in the search box. One
+  reused collator, and the property looked up once per sort rather than once
+  per comparison: the same sort is now 18ms, and fifty thousand rows went from
+  two seconds to seventy milliseconds.
+- **A relation link written as a wikilink could be added but never removed.**
+  The helpers compared a normalised entry against a raw title. Nothing in the
+  plugin passed one, so no vault was affected, but a function that takes a
+  title should not care how it was written.
+
+### Added
+
+- A fuzzing suite: every parser, every view, every chart and every widget are
+  drawn against generated hostile input, with a seeded generator so a failure
+  reproduces exactly. It is the suite that found all of the above.
+- Menus are now drivable from a test. Almost every action in this plugin is
+  behind one -- the row menu, the column menu, "add an option" -- and none of
+  it had ever been reachable from a test.
+
 ## 1.8.0
 
 Obsidian ships its own database feature now, so this release is partly about

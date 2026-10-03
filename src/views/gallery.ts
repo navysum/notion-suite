@@ -5,6 +5,7 @@ import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill, rowIcon } from "../utils/dom";
 import { coverUrl } from "./board";
 import { createInlineRow } from "./table";
+import { asList } from "../utils/text";
 
 export function renderGallery(
 	container: HTMLElement,
@@ -47,7 +48,7 @@ export function renderGallery(
 				const option = ctx.store.optionFor(prop, String(value));
 				pill(meta, String(value), option?.color ?? autoColor(String(value)));
 			} else if (prop.type === "multiselect") {
-				for (const item of value as string[]) {
+				for (const item of asList(value)) {
 					const option = ctx.store.optionFor(prop, item);
 					pill(meta, item, option?.color ?? autoColor(item));
 				}

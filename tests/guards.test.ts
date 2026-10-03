@@ -203,3 +203,35 @@ test("the table declares its own layout, so a theme cannot collapse it", () => {
 		`styles.css must keep these, or a theme can stack the cells: ${missing.join(", ")}`
 	);
 });
+
+/**
+ * Bug class: a comparator that builds its collation on every call.
+ *
+ * `localeCompare(x, undefined, options)` constructs a fresh collation each
+ * time, and a sort makes n log n of them. Sorting five thousand rows by a text
+ * property took 328ms because of it — on every render, including every
+ * keystroke in the search box. One reused `Intl.Collator` made the same sort
+ * eighteen times faster.
+ *
+ * No test can time this without being flaky, so this guards the shape instead.
+ */
+test("no comparison builds a collation on every call", () => {
+	const offenders: string[] = [];
+	for (const [file, text] of sources) {
+		text.split("\n").forEach((line, i) => {
+			// localeCompare with options is the expensive form. Without options
+			// it is cheap and fine.
+			// Not [^)]*: the first argument is usually a call of its own, like
+			// String(b), and a character class that stops at ")" never reaches
+			// the options. That mistake made this guard silently pass.
+			if (/\.localeCompare\(.*,\s*(undefined|["'][a-z])/.test(line)) {
+				offenders.push(`${file}:${i + 1}`);
+			}
+		});
+	}
+	assert.deepEqual(
+		offenders,
+		[],
+		`Use the shared collator in db/value.ts instead: ${offenders.join(", ")}`
+	);
+});

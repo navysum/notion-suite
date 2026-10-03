@@ -49,3 +49,22 @@ export function linkTarget(value: unknown): string {
 		.split("#")[0]
 		.trim();
 }
+
+/**
+ * Read a value as the list of strings it was meant to be.
+ *
+ * List properties -- multi-select, person, files, relation -- are written by
+ * hand, and `tags: Work` is far more common than `tags: [Work]`. Four places
+ * iterated such a value with `for (const item of value as string[])`, which is
+ * a cast rather than a check: a number or a map threw "not iterable" straight
+ * out of the render, and a bare string quietly iterated character by character
+ * and drew a chip per letter.
+ *
+ * A single value becomes a list of one, a list is flattened through asText,
+ * and anything with no sensible text falls out.
+ */
+export function asList(value: unknown): string[] {
+	if (value === null || value === undefined || value === "") return [];
+	const entries = Array.isArray(value) ? (value as unknown[]) : [value];
+	return entries.map(asText).filter((part) => part.length > 0);
+}

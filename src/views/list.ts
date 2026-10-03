@@ -4,6 +4,7 @@ import { ViewContext, openRow, rowContextMenu, runWrite } from "./context";
 import { formatValue, isEmpty } from "../db/value";
 import { autoColor, pill, rowIcon } from "../utils/dom";
 import { createInlineRow, renderTemplatePicker } from "./table";
+import { asList } from "../utils/text";
 
 export function renderList(
 	container: HTMLElement,
@@ -56,7 +57,7 @@ export function renderList(
 				const option = ctx.store.optionFor(prop, String(value));
 				pill(meta, String(value), option?.color ?? autoColor(String(value)));
 			} else if (prop.type === "multiselect") {
-				for (const entry of value as string[]) {
+				for (const entry of asList(value)) {
 					const option = ctx.store.optionFor(prop, entry);
 					pill(meta, entry, option?.color ?? autoColor(entry));
 				}
