@@ -12,6 +12,8 @@ import { coerce } from "./value";
 import { RowResolver } from "./resolve";
 import { csvFileName, rowsToCsv } from "./csv";
 import { nextDateFor, parseRecurrence } from "./recur";
+import { diffLinks, hasLink, withLink, withoutLink } from "./relations";
+import { firedBy, resolveValue } from "./automation";
 import { autoColor } from "../utils/dom";
 import { asText, linkTarget } from "../utils/text";
 
@@ -374,11 +376,119 @@ export class DatabaseStore extends Events {
 		// Computed properties are derived on read; there is nothing to persist.
 		if (prop && DERIVED_TYPES.includes(prop.type)) return;
 
+		// Read the old value before overwriting it: mirroring a two-way
+		// relation needs to know what was unlinked, not only what is linked now.
+		// Read the old value before overwriting it: mirroring needs to know what
+		// was unlinked, and a rule fires on the change rather than on the state.
+		const previousAny = this.readRaw(file, propertyId);
+		const previous = prop?.type === "relation" ? previousAny : undefined;
+
 		await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 			if (value === null || value === undefined || value === "") delete frontmatter[propertyId];
 			else frontmatter[propertyId] = value;
 		});
+
+		if (prop?.type === "relation" && prop.reverseProperty) {
+			await this.mirrorRelation(schema, prop, file.basename, previous, value);
+		}
+		await this.runAutomations(schema, file, propertyId, previousAny, value);
 		this.invalidate();
+	}
+
+	/**
+	 * Apply any rule that this edit sets off.
+	 *
+	 * The writes go straight to frontmatter rather than back through
+	 * `setValue`, so a rule cannot trigger a rule. Two rules watching the same
+	 * property both fire, which is predictable; a chain is not, and the loop it
+	 * can form is not worth the power it buys.
+	 */
+	private async runAutomations(
+		schema: DatabaseSchema,
+		file: TFile,
+		propertyId: string,
+		before: unknown,
+		after: unknown
+	): Promise<void> {
+		const rules = firedBy(schema.automations, propertyId, before, after);
+		if (rules.length === 0) return;
+
+		await this.app.fileManager.processFrontMatter(
+			file,
+			(frontmatter: Record<string, unknown>) => {
+				for (const rule of rules) {
+					const target = schema.properties.find((p) => p.id === rule.set);
+					// A rule must not write a computed property: the value would
+					// be overwritten on the next read, leaving a key that looks
+					// like data and is not.
+					if (target && DERIVED_TYPES.includes(target.type)) continue;
+					const value = resolveValue(rule, target);
+					if (value === null || value === "") delete frontmatter[rule.set];
+					else frontmatter[rule.set] = value;
+				}
+			}
+		);
+	}
+
+	/** One frontmatter value, straight from the metadata cache. */
+	private readRaw(file: TFile, key: string): unknown {
+		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+		return frontmatter ? (frontmatter as Record<string, unknown>)[key] : undefined;
+	}
+
+	/**
+	 * Keep the other side of a two-way relation in step.
+	 *
+	 * Writes go straight to frontmatter rather than back through `setValue`,
+	 * which is what stops the two sides mirroring each other forever: the
+	 * reverse property is itself usually a relation pointing back here, so
+	 * routing this through the normal write path would bounce.
+	 *
+	 * A note that already says the right thing is not touched. That matters
+	 * beyond tidiness -- every write wakes the metadata cache and redraws every
+	 * open view, so a no-op write is a visible flicker.
+	 */
+	private async mirrorRelation(
+		schema: DatabaseSchema,
+		prop: PropertyDef,
+		title: string,
+		before: unknown,
+		after: unknown
+	): Promise<void> {
+		const other = prop.relationDatabaseId ? this.get(prop.relationDatabaseId) : undefined;
+		const reverse = prop.reverseProperty;
+		if (!other || !reverse) return;
+
+		const { added, removed } = diffLinks(before, after);
+		if (added.length === 0 && removed.length === 0) return;
+
+		const index = new Map<string, TFile>();
+		for (const file of this.folderFiles(other.folder)) {
+			if (!index.has(file.basename.toLowerCase())) index.set(file.basename.toLowerCase(), file);
+		}
+
+		for (const [titles, link] of [
+			[added, true],
+			[removed, false],
+		] as const) {
+			for (const name of titles) {
+				const file = index.get(name.toLowerCase());
+				if (!file) continue;
+				const current = this.readRaw(file, reverse);
+				if (link ? hasLink(current, title) : !hasLink(current, title)) continue;
+				await this.app.fileManager.processFrontMatter(
+					file,
+					(frontmatter: Record<string, unknown>) => {
+						const next = link
+							? withLink(frontmatter[reverse], title)
+							: withoutLink(frontmatter[reverse], title);
+						if (next.length === 0) delete frontmatter[reverse];
+						else frontmatter[reverse] = next;
+					}
+				);
+			}
+		}
+		void schema;
 	}
 
 	/**

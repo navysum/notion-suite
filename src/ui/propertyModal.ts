@@ -260,8 +260,48 @@ export class PropertyModal extends Modal {
 						options,
 						this.draft.relationDatabaseId
 					);
-					dropdown.onChange((value) => (this.draft.relationDatabaseId = value));
+					dropdown.onChange((value) => {
+						this.draft.relationDatabaseId = value;
+						// The reverse property lives on the other database, so
+						// changing which database that is changes the choices.
+						this.draft.reverseProperty = undefined;
+						parent.empty();
+						this.renderTypeOptions(parent);
+					});
 				});
+
+			const other = this.draft.relationDatabaseId
+				? this.store.get(this.draft.relationDatabaseId)
+				: undefined;
+			if (other) {
+				new Setting(parent)
+					.setName("Mirror it back as")
+					.setDesc(
+						`Makes the relation two-way: linking a row here adds this row to that ` +
+							`property on the ${other.name} side, and unlinking removes it. ` +
+							`Leave it off for a one-way link.`
+					)
+					.addDropdown((dropdown) => {
+						const relations = other.properties.filter((p) => p.type === "relation");
+						const options: Array<[string, string]> = [
+							["", "One-way — do not mirror"],
+							...relations.map((p) => [p.id, p.name] as [string, string]),
+						];
+						this.draft.reverseProperty = selectOption(
+							dropdown,
+							options,
+							this.draft.reverseProperty ?? ""
+						);
+						dropdown.onChange((value) => (this.draft.reverseProperty = value || undefined));
+					});
+
+				if (other.properties.every((p) => p.type !== "relation")) {
+					parent.createEl("p", {
+						cls: "nfo-modal-hint",
+						text: `${other.name} has no relation property to mirror into yet. Add one there first, pointing back at this database.`,
+					});
+				}
+			}
 		}
 
 		if (type === "rollup") {

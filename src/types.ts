@@ -1,3 +1,4 @@
+import type { Automation } from "./db/automation";
 /**
  * Core data model.
  *
@@ -186,6 +187,12 @@ export interface PropertyDef {
 	options?: SelectOption[];
 	/** For `relation`: the id of the database being pointed at. */
 	relationDatabaseId?: string;
+	/**
+	 * For `relation`: the property on the *other* database that mirrors this
+	 * one, making the relation two-way. Absent leaves it one-way, which is what
+	 * every relation was before this existed.
+	 */
+	reverseProperty?: string;
 	/** For `rollup`: the relation property *on this database* to follow. */
 	rollupRelation?: string;
 	/** For `rollup`: the property in the related database to gather, or
@@ -354,6 +361,8 @@ export interface DatabaseSchema {
 	/** Named pre-filled rows, offered from the "New" button. */
 	rowTemplates?: RowTemplate[];
 	/** Property holding each row's parent, which turns rows into a tree. */
+	/** Rules that write one property when another changes. */
+	automations?: Automation[];
 	/**
 	 * Repeating rows: which property holds the rule, which date advances, and
 	 * which checkbox ticking off creates the next one.

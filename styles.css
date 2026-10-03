@@ -2041,3 +2041,28 @@ body.nfo-typography hr {
 		flex-wrap: wrap;
 	}
 }
+
+/* Rules: when this changes, do that. */
+.nfo-automation-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+	margin-bottom: 8px;
+}
+
+.nfo-automation-word {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.nfo-automation-row select,
+.nfo-automation-row input {
+	font-size: var(--font-ui-smaller);
+	min-width: 0;
+	flex: 1;
+}
+
+.nfo-automation-list {
+	margin: 6px 0 10px;
+}

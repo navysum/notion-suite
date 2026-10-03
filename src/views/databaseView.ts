@@ -6,6 +6,7 @@ import { ViewContext } from "./context";
 import { viewIcon } from "./renderer";
 import { runDetached } from "../utils/async";
 import { RecurrenceModal } from "../ui/recurrenceModal";
+import { AutomationModal } from "../ui/automationModal";
 
 export const DATABASE_VIEW_TYPE = "notion-suite-database";
 
@@ -239,6 +240,14 @@ export function databaseContextMenu(
 			.setTitle("Add a property…")
 			.setIcon("plus")
 			.onClick(() => plugin.openPropertyEditor(schema))
+	);
+	menu.addItem((item) =>
+		item
+			.setTitle("When this changes, do that…")
+			.setIcon("zap")
+			.onClick(() => {
+				new AutomationModal(plugin.app, plugin.store, schema, () => undefined).open();
+			})
 	);
 	menu.addItem((item) =>
 		item
